@@ -1,0 +1,44 @@
+{% extends "mysite/header.html" %}
+{%  load materializecss %}
+{% load static %}
+{% block content %}
+
+<div class="card-panel">
+            <h3>General Information</h3>
+          <div class="divider mb-1 mt-1"></div>
+          <form method="POST">
+            {%  csrf_token %}
+            <div class="row">
+              <div class="col s12">
+                <div class="input-field">
+                  <label for="username" class="active">User Name</label>
+                  {{ user_form.username }}
+                </div>
+                <div class="input-field">
+                  <label for="name" class="active">First Name</label>
+                  {{ user_form.first_name }}
+                </div>
+                  <div class="input-field">
+                  <label for="name" class="active">Last Name</label>
+                  {{ user_form.last_name }}
+                </div>
+                <div class="input-field">
+                  <label for="email" class="active">Email</label>
+                  {{ user_form.email }}
+                </div>
+                <div class="input-field">
+                  <label for="phone" class="active">Phone Number</label>
+                  {{ profile_form.phone_number }}
+                </div>
+                  {{ user_form.errors }}
+                  {{ user_form.non_field_errors }}
+              </div>
+              <div class="col s12 display-flex justify-content-end form-action">
+                <button class="btn" style="background-color: blueviolet; color:white" type="submit">Submit Changes</button>
+                <button type="button" class="btn btn-light-pink waves-effect waves-light mb-1">Cancel</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+{% endblock %}

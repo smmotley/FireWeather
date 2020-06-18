@@ -1,0 +1,73 @@
+
+    <ul id="sidenav-left" class="sidenav sidenav-fixed" style="transform: translateX(0px)">
+        <li><a href="" class="logo-container">
+            DASHBOARD<i class="material-icons left">spa</i></a></li>
+        <li class="no-padding">
+          <ul class="collapsible collapsible-accordion" style="padding: 0px">
+            <li class="bold waves-effect {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><a class="collapsible-header" tabindex="0">Pages<i class="material-icons chevron">chevron_left</i></a>
+              <div class="collapsible-body">
+                <ul>
+                  <li><a href="/pages/admin-dashboard" class="waves-effect">Dashboard<i class="material-icons">web</i></a></li>
+                  <li><a href="/pages/admin-fixed-chart" class="waves-effect">Fixed Chart<i class="material-icons">list</i></a></li>
+                  <li><a href="/pages/admin-grid" class="waves-effect">Grid<i class="material-icons">dashboard</i></a></li>
+                  <li><a href="/pages/admin-chat" class="waves-effect">Chat<i class="material-icons">chat</i></a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Charts<i class="material-icons chevron">chevron_left</i></a>
+              <div class="collapsible-body">
+                <ul>
+                  <li><a href="/pages/admin-line-charts" class="waves-effect">Line Charts<i class="material-icons">show_chart</i></a></li>
+                  <li><a href="/pages/admin-bar-charts" class="waves-effect">Bar Charts<i class="material-icons">equalizer</i></a></li>
+                  <li><a href="/pages/admin-area-charts" class="waves-effect">Area Charts<i class="material-icons">multiline_chart</i></a></li>
+                  <li><a href="/pages/admin-doughnut-charts" class="waves-effect">Doughnut Charts<i class="material-icons">pie_chart</i></a></li>
+                  <li><a href="/pages/admin-financial-charts" class="waves-effect">Financial Charts<i class="material-icons">euro_symbol</i></a></li>
+                  <li><a href="/pages/admin-interactive-charts" class="waves-effect">Interactive Charts<i class="material-icons">touch_app</i></a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Tables<i class="material-icons chevron">chevron_left</i></a>
+              <div class="collapsible-body">
+                <ul>
+                  <li><a href="/pages/admin-fullscreen-table" class="waves-effect">Fullscreen with Chart<i class="material-icons">show_chart</i></a></li>
+                  <li><a href="/pages/admin-table-custom-elements" class="waves-effect">Table with Custom Elements<i class="material-icons">settings</i></a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Calendar<i class="material-icons chevron">chevron_left</i></a>
+              <div class="collapsible-body">
+                <ul>
+                  <li><a href="/pages/admin-calendar" class="waves-effect">Calendar<i class="material-icons">cloud</i></a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Headers<i class="material-icons chevron">chevron_left</i></a>
+              <div class="collapsible-body">
+                <ul>
+                  <li><a href="/pages/admin-header-tabbed" class="waves-effect">Tabbed<i class="material-icons">tab</i></a></li>
+                  <li><a href="/pages/admin-header-metrics" class="waves-effect">Metrics<i class="material-icons">web</i></a></li>
+                  <li><a href="/pages/admin-header-search" class="waves-effect">Search<i class="material-icons">search</i></a></li>
+                </ul>
+              </div>
+            </li>
+            <li class="bold waves-effect {% if request.resolver_match.url_name == 'profile' or 'change_password' or 'change_location'%}active{% endif %}"><a class="collapsible-header" tabindex="0">Account<i class="material-icons chevron">chevron_left</i></a>
+              <div class="collapsible-body">
+                <ul>
+                    {% if user.is_authenticated %}
+                        <li><a href="/profile"> General <i class="material-icons">person</i></a></li>
+                        <li><a href="/change_pw">Change Password <i class="material-icons">fingerprint</i></a></li>
+                        <li><a href="/change_location">Location Alerts <i class="material-icons">edit_location</i></a></li>
+                        <li><a href="/logout">Logout {{ user.username }} <i class="material-icons">directions_run</i></a></li>
+                    {% else %}
+                        <li><a href="/login">Login<i class="material-icons">person</i></a></li>
+                        <li><a href="/register">Register<i class="material-icons">create</i></a></li>
+                    {% endif %}
+                </ul>
+              </div>
+            </li>
+          <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Map Toggles<i class="material-icons chevron">chevron_left</i></a>
+              {% include "goesFire/includes/map_toggles.html"%}
+          </li>
+          </ul>
+        </li>
+      </ul>

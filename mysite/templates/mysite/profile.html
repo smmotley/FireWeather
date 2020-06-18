@@ -1,0 +1,14 @@
+{% extends "mysite/header.html" %}
+{%  load materializecss %}
+{% block content %}
+    <form method = "POST">
+        {%  csrf_token %}
+        {% for non_field_error in profile_form.non_field_errors %}
+            <p class="help is-danger">{{ non_field_error }}</p>
+        {% endfor %}
+            {{ user_form.username }}
+            {{ profile_form.as_p }}
+        <button class="btn" style="background-color: blueviolet; color:white" type="submit">Submit Changes</button>
+    </form>
+    If you already have an account, <a href="/login"><strong>login</strong></a> instead
+{% endblock %}

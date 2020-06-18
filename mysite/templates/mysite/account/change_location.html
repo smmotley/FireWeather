@@ -1,0 +1,146 @@
+{% extends "mysite/header.html" %}
+{% load materializecss %}
+{% load static %}
+{% block content %}
+    <script>M.AutoInit();</script>
+      <!-- Mapbox JS-->
+    <script src='https://api.mapbox.com/mapbox-gl-js/v1.10.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v1.10.1/mapbox-gl.css' rel='stylesheet' />
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.min.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v4.5.1/mapbox-gl-geocoder.css" type="text/css"/>
+<div class="row">
+    <div class="col s12">
+      <ul class="tabs tabs-fixed-width" id="change_location_tabs">
+        <li class="tab col s3"><a href="#location_tab">Your Locations</a></li>
+        <li class="tab col s3"><a class="active" href="#map_tab">Map Your Locations</a></li>
+      </ul>
+    </div>
+    <div id="map_tab" class="col s12">
+        <div class="card-pannel z-depth-2">
+            <div id="map_geolocation" class="map map-big"></div>
+             <div id="geocoder"></div>
+            {{ mapbox_access_token|json_script:"mb_tkn"}}
+            <script type="module" src="{% static "js/util/geo_location.js" %}"></script>
+            <script type="text/javascript">
+                location_data = {{ location_data|safe }}
+                user_profile = {{ profile_obj|safe }}
+            </script>
+
+        </div>
+    </div>
+    <div id="location_tab" class="col s12">
+        <div class="card-pannel z-depth-2">
+            <div class="row">
+                <span class="col s1" style="margin-top: 10px">
+                    <button id="add_point" class="btn-floating btn-small pulse waves-effect waves-light indigo" style="visibility: hidden"><i class="material-icons">add</i></button>
+                </span>
+                <div class="col s10 " id="geolocation_searchbar" style="margin-top: 5px"></div>
+
+            </div>
+            <div class="divider"></div>
+        <div class="row" style="padding: 10px">
+            <form method="POST">
+            {%  csrf_token %}
+
+            <table class="striped centered" id="savedLocations" >
+                <thead>
+                  <tr>
+                      <th>Options</th>
+                      <th>Your Places</th>
+                      <th>Latitude</th>
+                      <th>Longitude</th>
+                      <th>Radius For Alert</th>
+                      <th>Alert Me</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                {% for location in location_template.features %}
+                    <tr>
+                        {% if location.properties.type == "hidden" %}
+                            <td class="center-align" style="width: 100px; display: none">
+                        {% else %}
+                            <td class="center-align" style="width: 100px">
+                        {%  endif %}
+                            <i style="margin-left: 5px; color:#ff6f00; cursor:pointer;" class="material-icons"
+                            @click="deativate(article.id)">clear</i>
+                            <i class="material-icons" style="margin-left: 2px; color:#ffc107; cursor:pointer;"
+                            @click="getById(article), fillSelectCategories()">edit</i>
+                            {% if location.properties.id == 'fav0' %}
+                                <i id="geolocate_user" class="material-icons" style="margin-left: 2px; color:#073dff; cursor:pointer;"
+                                    @click="getById(article), fillSelectCategories()">gps_fixed</i>
+                            {% endif %}
+                        </td>
+                        <td><input type="{{ location.properties.type }}" name="{{ location.properties.id }}_desc" id="{{ location.properties.id }}_desc" value="{{ location.properties.description | default_if_none:"--"}}"></td>
+                        <td><input type="{{ location.properties.type }}" name="{{ location.properties.id }}_lat" id="{{ location.properties.id }}_lat" value="{{ location.geometry.coordinates.1 | default_if_none:"--"}}"></td>
+                        <td><input type="{{ location.properties.type }}" name="{{ location.properties.id }}_lng" id="{{ location.properties.id }}_lng" value="{{ location.geometry.coordinates.0 | default_if_none:"--"}}"></td>
+                        <td><input type="{{ location.properties.type }}" name="{{ location.properties.id }}_radius" id="{{ location.properties.id }}_radius" value="{{ location.properties.radius | default_if_none:"--"}}"></td>
+                        <td><input type="{{ location.properties.type }}" name="{{ location.properties.id }}_alert" id="{{ location.properties.id }}_alert" value="{{ llocation.properties.alert | default_if_none:"--"}}"></td>
+                    </tr>
+                 {% endfor %}
+                </tbody>
+            </table>
+             <div class="display-flex justify-content-end form-action">
+                <button type="submit" class="btn indigo waves-effect waves-light mr-1">Save changes</button>
+                <button type="reset" class="btn btn-light-pink waves-effect waves-light">Cancel</button>
+             </div>
+            </form>
+        </div>
+            <div id="progress_container" style="display: none">
+                <div class="preloader-wrapper small active">
+                <div class="spinner-layer spinner-green-only">
+                    <div class="circle-clipper left">
+                        <div class="circle"></div>
+                    </div>
+                    <div class="gap-patch">
+                        <div class="circle"></div>
+                    </div>
+                    <div class="circle-clipper right">
+                        <div class="circle"></div>
+                    </div>
+                </div>
+                </div>
+                <p class="blinking">Locating...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- ********* MODAL Start ****************** -->
+    <div id="location_modal" class="modal">
+    <div class="modal-content">
+      <h4>Saved Locations Limit</h4>
+      <p>You already have two saved locations. Please delete one of your locations before continuing.</p>
+        <table class="striped centered" id="savedLocations" >
+                <thead>
+                  <tr>
+                      <th>Delete</th>
+                      <th>Your Places</th>
+                  </tr>
+                </thead>
+            <tbody>
+        {% for location in location_template.features %}
+            <tr>
+            {% if location.properties.id != 'fav0' %}
+                {% if location.properties.type == "hidden" %}
+                    <td class="center-align" id="delete_location_{{  location.properties.id }}" style="width: 100px; display: none">
+                {% else %}
+                    <td class="center-align" id="delete_location_{{  location.properties.id }}" style="width: 100px">
+                {%  endif %}
+                <i style="margin-left: 5px; color:#ff6f00; cursor:pointer;" class="material-icons">clear</i>
+                </td>
+                <td><input type="{{ location.properties.type }}" name="{{ location.properties.id }}_desc_modal" id="{{ location.properties.id }}_desc_modal" value="{{ location.properties.description | default_if_none:"--"}}"></td>
+            {% endif %}
+            </tr>
+         {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    <div class="modal-footer">
+      <a href="#" class="modal-action modal-close waves-effect waves-green btn-flat">Cancel</a>
+    </div>
+</div>
+    <!-- ********* MODAL End ****************** -->
+
+
+{% endblock %}

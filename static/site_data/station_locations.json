@@ -1,0 +1,26 @@
+{"data": [
+  {"-lat":"39.025277","-lon":"-120.594444","id":"R4","name":"MIDDLE FORK AMERICAN RIVER ABOVE MIDDLE FORK POWERHOUSE NR FORESTHILL","type":"METER"},
+{"-lat":"39.025855","-lon":"-120.602797","id":"R5","name":"MIDDLE FORK AMERICAN RIVER BELOW INTERBAY DAM (PCWA)","type":""},
+{"-lat":"39.056666","-lon":"-120.406944","id":"R6","name":"RUBICON RIVER BELOW HELL HOLE DAM (PCWA)","type":"METER"},
+{"-lat":"39.051111","-lon":"-120.470555","id":"R7","name":"SOUTH FORK LONG CANYON CREEK DIVERSION TUNNEL (PCWA)","type":"METER"},
+{"-lat":"39.049166","-lon":"-120.482222","id":"R8","name":"NORTH FORK LONG CANYON CREEK DIVERSION TUNNEL (PCWA)","type":"METER"},
+{"-lat":"39.023775","-lon":"-120.720602","id":"R10","name":"NORTH FORK OF MIDDLE FORK AMERICAN RIVER NEAR FORESTHILL","type":"METER"},
+{"-lat":"39.006111","-lon":"-120.759722","id":"R11","name":"MIDDLE FORK AMERICAN RIVER NR FORESTHILL","type":"METER"},
+{"-lat":"39.107875","-lon":"-120.432130","id":"R12","name":"FRENCH MEADOWS RESERVOIR","type":"RESERVOIR"},
+{"-lat":"39.065250","-lon":"-120.414730","id":"R13","name":"HELL HOLE RESERVOIR NR MEEKS BAY, CA","type":"RESERVOIR"},
+{"-lat":"39.077991","-lon":"-120.406069","id":"R14","name":"FRENCH MEADOWS POWERHOUSE (PCWA)","type":"POWERHOUSE"},
+{"-lat":"39.024899","-lon":"-120.596001","id":"R15","name":"MIDDLEFORK POWERPLANT NEAR FORESTHILL (PCWA)","type":"POWERHOUSE"},
+{"-lat":"39.007708","-lon":"-120.731997","id":"R20","name":"MIDDLE FORK AMERICAN ABOVE LITTLE CIRCLE BRIDGE","type":""},
+{"-lat":"39.079100","-lon":"-120.347702","id":"R22","name":"RUBICON RIVER ABOVE HELL HOLE RESERVOIR","type":"METER"},
+{"-lat":"39.079811","-lon":"-120.342597","id":"R23","name":"FIVE LAKES CREEK ABOVE HELL HOLE","type":"METER"},
+{"-lat":"39.134513","-lon":"-120.406600","id":"R24","name":"MIDDLE FORK AMERICAN RIVER ABOVE FRENCH MEADOWS","type":"METER"},
+{"-lat":"39.051111","-lon":"-120.470555","id":"R27","name":"SOUTH FORK LONG CANYON CREEK BELOW DIVERSION","type":"METER"},
+{"-lat":"39.049166","-lon":"-120.482222","id":"R28","name":"NORTH FORK LONG CANYON CREEK BELOW DIVERSION","type":"METER"},
+{"-lat":"38.960144","-lon":"-120.484152","id":"R29","name":"RUBICON RIVER ABOVE ELLICOTT’S CROSSING","type":"METER"},
+{"-lat":"39.000277","-lon":"-120.723055","id":"R30","name":"RUBICON RIVER ABOVE RALSTON P.H.","type":"METER"},
+{"-lat":"38.885129","-lon":"-121.059915","id":"R31","name":"NORTH FORK AMERICAN RIVER ABOVE ARPS","type":"METER"},
+{"-lat":"39.005267","-lon":"-120.75299","id":"MFAC1","name":"MIDDLE FORK AMERICAN RIVER - FOREST HILL","type":"CNRFC"},
+{"-lat":"39.01421","-lon":"-120.73574","id":"NMFC1","name":"NORTH FORK OF MIDDLE FORK AMERICAN RIVER","type":"CNRFC"},
+{"-lat":"38.98926","-lon":"-120.717879","id":"RUFC1","name":"RUBICON NEAR FOREST HILL","type":"CNRFC"}
+  ]
+}
