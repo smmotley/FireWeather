@@ -7,7 +7,7 @@ from django.contrib.auth import logout, login, authenticate, update_session_auth
 from django.contrib import messages
 from mysite.forms import NewUserForm, EditUserForm, UserLocationForm
 from .forms import UserProfileForm
-from goesFire.models import Profile
+from goesFire.models import Profile, Alert
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from django.core import serializers
@@ -126,7 +126,7 @@ def change_password(request):
 @login_required
 @transaction.atomic
 def change_location(request):
-    MB_TOKEN = ''
+    MB_TOKEN = 'pk.eyJ1Ijoic21vdGxleSIsImEiOiJuZUVuMnBBIn0.xce7KmFLzFd9PZay3DjvAA'
     profile_obj = Profile.objects.filter(user=request.user)
     geojson_locations = create_markers(profile_obj[0])
     if request.method == 'POST':

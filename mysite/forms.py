@@ -62,7 +62,7 @@ class UserLocationForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ("user_lat", "user_lng", "user_radius", "userCords",
+        fields = ("user_lat", "user_lng", "user_radius",
                   "fav1_lat", "fav1_lng", "fav1_radius", "fav1_desc",
                   "fav2_lat", "fav2_lng", "fav2_radius", "fav2_desc",
                   "phone_number") # So, same as before, but now we're including email

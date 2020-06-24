@@ -19,8 +19,10 @@ from shapely.geometry import Point, MultiPoint
 import json
 import logging
 from django.conf import settings
-from django.db.models import F, Q
-from goesFire.models import Profile
+from django.db.models import F, Q, Max, Min
+from goesFire.models import Profile, Alert, GoesFireTable, CAfire
+from django.db import connection, IntegrityError
+from django.core.mail import send_mail
 from GOES_Image_Creator import Fire_Image
 from noaa_aws import AwsGOES
 from timeloop import Timeloop
@@ -30,6 +32,7 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'FireWeather.settings'
 logging.basicConfig(filename='logfile.log',level=logging.ERROR)
 t1 = Timeloop()
 GOES_NUMBER = '17'
+debugging = True
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db.sqlite3')
 CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
 CURSOR = CONN.cursor()
@@ -152,8 +155,11 @@ def main():
 
         # Get Lat/lng values of all active fire points via GOES-R FIRE/HOTSPOT Characterization:
         # Additional Info: https://www.goes-r.gov/products/baseline-fire-hot-spot.html
-        Cf = goes_hotspot.download_file(ALL_FILES[FILE], goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
-        #Cf = goes_hotspot.download_file('ABI-L2-FDCF/2019/218/17/OR_ABI-L2-FDCF-M6_G17_s20192181720341_e20192181729408_c20192181729505.nc', goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
+        if debugging:
+            import netCDF4 as nc
+            Cf = nc.Dataset('../ABI_fire.nc', 'r')
+        # Cf = goes_hotspot.download_file(ALL_FILES[FILE], goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
+        # Cf = goes_hotspot.download_file('ABI-L2-FDCF/2019/218/17/OR_ABI-L2-FDCF-M6_G17_s20192181720341_e20192181729408_c20192181729505.nc', goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
 
         # Timestamp on Fire Characterization / Hotspot detection file.
         fdfc_seconds = int(np.ma.round(Cf.variables['t'][0], decimals=0))
@@ -614,154 +620,116 @@ def goes_firetemp_img(C, ca_fire_latlng, FILE, fire_id, only_RGB=False):
 
 def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
 
-    """ - Pass in list of lat / lngs of fires ID'd by GOES-R.
-        - Return a dataframe containing the same lat / lngs, but now include what fire each of those points is
-            associated with (based on CAL Fire or, if no CAL fire, based on our own assigned ID).
+    """ - Purpose: Determine if a GOES detected fire is a single pixel or a part of a larger group.
+                - Pass in list of lat / lngs of fires ID'd by GOES-R.
+                - Determine distance of each point to other points in the database.
+                    - If distances are close enough, group the new point with the others
+                    - If no other fire is close enough, this is a new fire. Give it an ID of (max id + 1)
+                - Check the CAL Fire Database to see if CAL Fire has identified this fire.
+                    - This will ultimately be used in the alert DB where, if the CAL fire DB has a fire, and
+                      that fire is close to the user, but the cal fire ID isn't in our GoesFireTable DB, then
+                      the Cal Fire has detected a fire before the GOES-R has.
 
         Groups individual fire points into a single fire complex and tests whether that fire is associated with
-        a fire that CAL Fire has already identified. If CAL Fire has already ID'd a fire, assign that fire's ID to
-        the same fire ID as CAL_Fire. If the fire has not been ID'd assign the fire a random ID. Update the SQL data
-        base and return a dataframe containing the newly ID'd fire groups and fire ID's.
+        a fire that CAL Fire has already identified. Update the SQL database.
     :param fire_ll: list of tuples in the form of (center latitude, center longitude) of each grid box
                     that has been assumed to be a valid fire.
     :param xres:    The grid box with the largest x_direction (lat) within the raster. This value isn't critical and
                     we could simply hard code the value in (it should be around 1000 meters), but we use it in the
                     function below to limit the acceptable distance of a given fire point to an ID'd fire from CALFire.
     :param yres:    Same as xres but in the y dir
-    :return:        Returns a dataframe with the same latlng passed to the function, but with a column for whether
-                    points are a part of the same fire AND a column for the fire ID (the goal is at some point the
-                    fire will be ID'd by CalFire and it will eventully obtain that ID).
+    :return:        
     """
     fire_pts = [{"lat": ll[1], "lng":ll[0], "fire_id": nan, "scan_dt": DATE, "s3_filename":FILE} for ll in fire_ll]
     fire_group_num = max_group_id
-
-    # Get every lat/lng point that exists in the database
-    sql = "SELECT lng, lat, fire_id, scan_dt_id, s3_filename, cal_fire_incident_id FROM goesFire_goesfiretable"
-    CURSOR.execute(sql)
-    db_resp = CURSOR.fetchall()
-
-    # Get only the last two elements (i.e. drop the id and kep latlng)
-    # "set" is a fantastic function that will turn this into an unordered/unindexed dict of tuples.
-    # So if you do something like: thisset = {"apple", "banana", "cherry"}, then print("banana" in set) -> True
-    db_latlngs = set([resp[:2] for resp in db_resp])
-
-    # We need to create a dict in order to compare what's in the database to our current GOES-R fire pts
-    db_fire_pts = [{"lat": dbll[1],
-                    "lng": dbll[0],
-                    "fire_id": dbll[2],
-                    "scan_dt": dbll[3],
-                    "s3_filename": dbll[4],
-                    "cal_fire_incident_id": dbll[5],
-                    } for dbll in db_resp]
-
-    # Only accept points that don't exist in the database yet.
-    new_fire_pts = [pt for pt in fire_pts if (pt["lng"], pt["lat"]) not in db_latlngs]
-
-    # Extend any new points to the end of the array containing the all the current points.
-    db_fire_pts.extend(new_fire_pts)
-
-    # The following loops: Check each valid fire pixel and determine if it has an ID associated with it. If not,
-    #                      assign it a new ID based on its proximity to any other valid fire pixels.
-    #
-    # Assigning a new ID to a fire pixel is done by:
-    # 1) If this new point doesn't have an id, we will loop through all the fire pixels to see if it's
-    #    a) part of an existing fire (i.e. close enough to another pixel that has an ID already)
-    #    b) a new fire (i.e. a pixel that is to far away to any other active fire, so a new ID will be given).
-    # 2) If this pixel already has an ID, the loop will see if there are any additional points that may
-    #   have been missed (e.g. this new point could be on the opposite edge of the fire, which may put it close
-    #   enough to other grid boxes that the first point missed).
-
-    for row in db_fire_pts:
-        row_point = Point(row["lng"], row["lat"])
-        for pt in db_fire_pts:
-            pt_coords = Point(pt["lng"], pt["lat"])
-            # To find the distnace in meters, we need to solicit pyproj
-            geod = Geod(ellps='WGS84')
-
-            angle1, angle2, dist = geod.inv(row_point.x, row_point.y, pt_coords.x, pt_coords.y)
-            if dist < xres * 10:
-                # These two points are close enough to be considered the same fire. So we are checking two things:
-                # 1) This point in the database already has an ID
-                #    a) Always use the lowest, non-null, group number. This ensures that if a point that develops
-                #       between two fires, this new point would link the two fires together. This only works
-                #       because we're looping from ID #1 to ID #n; therefore, if this is a point that links two
-                #       fires it would first link fire_id = x, then link fire_id = x+n, but both fires would be
-                #       assigned fire_id = x
-
-                row["fire_id"] = np.nanmin([pt["fire_id"], row["fire_id"]])
-                # If row["fire_id"] is still nan, than both of these points are none and we need to assign an ID
-                if np.isnan(row["fire_id"]):
-                    row["fire_id"] = fire_group_num
-                    pt["fire_id"] = fire_group_num
-                    fire_group_num += 1
-
-            # The points were too far apart to be considered a fire, but double check to make sure the point in the
-            # database actually has an id (could probably leave this code out, but its a failsafe).
-            if np.isnan(pt["fire_id"]):
-                    pt["fire_id"] = fire_group_num
-                    fire_group_num += 1
-
-        # Finally, if the row we're checking still does not have an ID at this time, then it means it is not close
-        # enough to any other point and it needs to be assigned an new ID.
-        if np.isnan(row["fire_id"]):
-            row["fire_id"] = fire_group_num
-            fire_group_num += 1
-
-    # Now that we have grouped our fire points into fires, we want to see if CAL Fire has already
-    # declared any of these as active fires. The idea here is to download the fire data via csv (no api as of yet),
-    # and test whether any of the points detected on the GOES-R are associated with a fire already identified by CAL
-    # fire. If so, our fire points will now be given that fire ID, which will act the foreign key to each sql table.
-    # So, first we have to check if any of our fires are within a certain range of all the fires listed. If not,
-    # then CAL fire has not identified the fire and we will assign our own id to the points.
-
-    df = pd.DataFrame(db_fire_pts)
-    df["cal_fire_incident_id"] = np.nan
-    df_calfire = pd.DataFrame()
     try:
-        df_calfire = pd.read_csv("https://www.fire.ca.gov/imapdata/mapdataactive.csv")
-        df_calfire.to_sql("goesFire_cafire", CONN, if_exists='replace', index=True, index_label='id')
-        df_calfire.drop(df_calfire[df_calfire.is_active == 'N'].index, inplace=True)
-    except:
-        print("Could Not download CALFIRE csv")
+        # Get largest group number ID
+        fire_group_num = GoesFireTable.objects.order_by("fire_id").last().fire_id
+    except AttributeError as e:
+        print("Can not find a group number, is the database new? Changing group number to 1")
+        fire_group_num = 0
 
-    if not df_calfire.empty and not df.empty:
-        # Store Cal Fire's incident lat lng points as a list of shapely POINT objects
-        cf_pts = [Point(lng, lat) for lng, lat in zip (df_calfire["incident_longitude"], df_calfire["incident_latitude"])]
+    fire_group_num = fire_group_num + 1
 
-        # Shapely has a function that will calculate closest point to a list of points. For every valid fire point in
-        # our grid, we will store the nearest point. This returns a list of tuples where
-        # tuple[0] = reference point (in lng lat) and tuple[1] = nearest point to our ref point.
-        nearest = [shapely.ops.nearest_points(Point(lng,lat), MultiPoint(cf_pts))
-                   for lng, lat in zip(df['lng'],df['lat'])]
+    for ll in fire_ll:
+        # The idea here is that we have three scenarios for a new fire pixel:
+        #   CASES:
+        # 1) It's a new fire that is too far away from any other fire to be considered a part of any other fire.
+        #   --> In this case, give it a new ID.
+        # 2) It's close enough to be considered a part of an existing fire.
+        #   --> In this case, give it the same ID as the existing fire.
+        # 3) It's between two (or more) merging fires, and this new pixel is serving to merge the other fires.
+        #   --> In this case, use the smallest fire ID (e.g. if we have an id of 3,6,20 -> give it an ID of 3)
+        #       AND give all the other fires the same ID as well (in the afformentioned case, fires 6, and 20
+        #       would have their ID's CHANGED to 3 as well.
 
-        for pt in nearest:
-            # Return the row (index number) of the dataframe for the point we're examining.
-            df_row = df.loc[df["lat"] == pt[0].y].index[0]
+        # Find the maximum fire ID in the entire database
+        maxID = GoesFireTable.objects.all().aggregate(max_id=Max('fire_id'))['max_id']
 
-            # x != x will be true if x is nan. So if we don't have a Cal Fire ID for this row, check to see if
-            # there is a Cal Fire close to our point.
-            if df.iloc[df_row]["cal_fire_incident_id"] != df.iloc[df_row]["cal_fire_incident_id"]:
-                raster_pt = pt[0]
-                closest_cal_fire = pt[1]
-                #distance = raster_pt.distance(closest_cal_fire)
+        # Get all points in database that are within 2 miles of this point, but also > 0 (don't want same point).
+        closest_points = GoesFireTable.objects.fire_pixel_dist(ll[0], ll[1]) \
+            .filter(distance__lt=(xres * 10), distance__gt=0)
 
-                # To find the distnace in meters, we need to solicit pyproj
-                geod = Geod(ellps='WGS84')
-                angle1, angle2, distance = geod.inv(raster_pt.x, raster_pt.y, closest_cal_fire.x, closest_cal_fire.y)
-                if distance < xres*20:
-                    # Get the row (index number) of the dataframe for the point we're examining.
-                    df_row = df.loc[df["lat"] == pt[0].y].index[0]
+        # ************** (CASE 1) fire_id = +1 **************
+        # No close points in the entire database were found, give the current point a new fire_id.
+        if closest_points.count() == 0:
+            new_fire_id = list(sum(filter(None,[maxID,1])))[0]  # A fancy way to sum values if one of the values is None
+            print(new_fire_id)
+        # ************** CASE 2) fire_id = closest fire ID ***************
+        # This point is close to another fire, give this point the same ID as the other fire.
+        else:
+            # Get the smallest fire group number of all the points that are close.
+            new_fire_id = closest_points.aggregate(min_id=Min('fire_id'))['min_id']
+            # fire_group_id = closest_points.order_by('-fire_id').last().fire_id
+            if new_fire_id is None:
+                new_fire_id = list(sum(filter(None,[maxID,1])))[0]  # A way to sum values if one of the values is None
 
-                    # Get the row of calfire dataframe.
-                    df_calfire_row = df_calfire.loc[df_calfire["incident_latitude"] == pt[1].y].index[0]
+            closest_pt_ids = closest_points.order_by().values_list('fire_id', flat=True).distinct()
+
+            # Change any "None" values to nan so that we can update any nan values in the DB
+           # closest_pt_ids = np.array(list(closest_pt_ids), dtype=np.float).tolist()
+
+            # ************** CASE 3) merged fire --> fire_id still = closest fire_id ***************
+            # There are multiple ID's that are close to this point, that means this pixel is merging two fires.
+            # Update all ID's (including this new point) to the smallest ID.
+            if len(closest_pt_ids) > 1:
+                update_ids = GoesFireTable.objects.filter(fire_id__in=list(closest_pt_ids))
+                update_ids.update(fire_id=new_fire_id)
+        try:
+            obj, created = GoesFireTable.objects.get_or_create(lat=ll[1],
+                                                               lng=ll[0],
+                                                               scan_dt=DATE,
+                                                               s3_filename=FILE,
+                                                               fire_id=new_fire_id)
+            print(created)
+
+        except IntegrityError as e:
+            print("This point is already in the database --> \n " + e.args[0])
 
 
-                    this_fireID = df.iloc[df_row]['fire_id']
+    # Now all of our fires have an ID associated with them. Let's now check every point that doesn't have a
+    # CAL fire ID associated with it to see if there are any CAL fires close enough to be associated with that fire.
 
-                    # Change the cal_fire_incident_id number in the df to the same as in the df_calfire
-                    df.loc[df.fire_id == this_fireID, "cal_fire_incident_id"] = df_calfire.loc[df_calfire_row]["incident_id"]
-    df.to_sql('goes_r_fire', CONN, index=False, if_exists='replace')
-    return df
+    calfires = CAfire.objects.filter(incident_is_final=0)
+    for calfire in calfires:
+        ca_lat = calfire.incident_latitude
+        ca_lng = calfire.incident_longitude
+
+        # Get all points in database that are within 4 miles of this point.
+        closest_fire_pixels = GoesFireTable.objects.fire_pixel_dist(latitude=ca_lat, longitude=ca_lng) \
+            .filter(distance__lt=(xres * 20))
+
+        # Get any fire ID that is close to this point.
+        closest_fire_ids = closest_fire_pixels.order_by().values_list('fire_id', flat=True).distinct()
+
+        # For any fire_id that is close to this Cal Fire, update the calfire_id for all entries with that fire_id.
+        if closest_fire_pixels.count() > 0:
+            update_calfire_ids = GoesFireTable.objects.filter(fire_id__in=list(closest_fire_ids))
+            update_calfire_ids.update(cal_fire_incident_id=calfire.incident_id)
+            print(f"A Cal Fire incident {calfire.incident_id} was reported close to a GOES pixel id "
+                  f"{closest_pt_ids[0]}")
+
+    return
 
 def alert_user(alert_num, userID, st_time, fire_id):
     sql = "SELECT * FROM goesFire_profile WHERE user_id = ?"
@@ -857,9 +825,11 @@ def create_mp4(conn, scan_time, fire_id, loop_hours):
 
 def update_alertDB(loop_duration, user_email):
     past_hour = datetime.utcnow() - timedelta(hours=loop_duration)
+    if debugging:
+        past_hour = datetime.utcnow() - timedelta(hours=100)
 
     # List of all GOES detected hotspots in the last hour.
-    sql = "SELECT lng, lat, fire_id FROM goesFire_goesfiretable WHERE scan_dt_id >= ?"
+    sql = "SELECT lng, lat, fire_id FROM goesFire_goesfiretable WHERE scan_dt >= ?"
     CURSOR.execute(sql, [past_hour])
     respGoesF = list(CURSOR.fetchall())
 
@@ -878,74 +848,92 @@ def update_alertDB(loop_duration, user_email):
     CURSOR.execute(sql)
     respUsers = list(CURSOR.fetchall())
 
-    arr = np.array(respUsers)
+    # arr = np.array(respUsers)
     # Latlng of user turned into Point cords
-    userll = Point(respUsers[0][:-1])
+    #userll = Point(respUsers[0][:-1])
 
-    fire_dist = Profile.objects.with_distance(-120, 39.9, "miles").filter(distance_to_user__lt=F('user_radius'))
-    test = Profile.objects.with_distance(-120, 39.9, "miles")
-    test2 = list(test.filter(distance_to_user__lt=200))
+    #fire_dist = Profile.objects.with_distance(-120, 39.9, "miles").filter(distance_to_user__lt=F('user_radius'))
+    #test = Profile.objects.with_distance(-120, 39.9, "miles")
+    #test2 = list(test.filter(distance_to_user__lt=200))
     # User ID number
     userID = respUsers[0][2]
 
     # Did GOES detect any hotspots within range of user
-    #for pt in [(-120.2,38.7)]:
+    #for pt in [(-120.2,38.7,1)]:
     for pt in respGoesF:
-        fire_dist = Profile.objects.with_distance(pt[0],pt[1], "miles")\
+        dist_to_users = Profile.objects.with_distance(pt[0],pt[1], "miles")\
             .filter(Q(distance_to_user__lt=F('user_radius')) | Q(distance_to_fav1__lt=F('fav1_radius')) |
                     Q(distance_to_fav2__lt=F('fav2_radius')))
-        test = list(fire_dist)
-        ll = Point(pt[:-1])  # Lat lng of point
-        fire_id = pt[2]  # ID given to fire
 
-        geod = Geod(ellps='WGS84')
-        angle1, angle2, dist = geod.inv(ll.x, ll.y, userll.x, userll.y)  # Distance of user to fire in meters
+        if dist_to_users.exists():
+            for usr in dist_to_users:
+                alert, created = Alert.objects.get_or_create(fire_id=pt[2], user_id=usr.user.id)
+                if created:
+                    print(f"New Alert Created For:  {usr.user}")
 
-        sql = "SELECT need_to_alert FROM goesFire_profile WHERE user_id = ? AND alerted_incident_id = ?"  # Check user has been alerted to this ID
-        CURSOR.execute(sql, [userID, fire_id])
-        already_alerted = CURSOR.fetchone()  # This will be None if not alerted yet.
+        # ll = Point(pt[:-1])  # Lat lng of point
+        # fire_id = pt[2]  # ID given to fire
+        #
+        # geod = Geod(ellps='WGS84')
+        # angle1, angle2, dist = geod.inv(ll.x, ll.y, userll.x, userll.y)  # Distance of user to fire in meters
+        #
+        # sql = "SELECT need_to_alert FROM goesFire_profile WHERE user_id = ? AND alerted_incident_id = ?"  # Check user has been alerted to this ID
+        # CURSOR.execute(sql, [userID, fire_id])
+        # already_alerted = CURSOR.fetchone()  # This will be None if not alerted yet.
+        #
+        # # 1 m = 0.00062 miles
+        # # If dist is < 100 miles add this point to the user_alert_log and set need_to_alert value to True
+        # if (dist*0.00062) < 100 and not already_alerted:
+        #     sql = '''INSERT INTO goesFire_profile
+        #                 (user_id, alerted_incident_id, alert_time, need_to_alert, dist_to_fire, fire_lng, fire_lat)
+        #                 VALUES (?, ?, ?, ?, ?, ?, ?)'''
+        #     CURSOR.execute(sql, [userID, fire_id,
+        #                          datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True, int(dist*0.00062),
+        #                          pt[0], pt[1]])
+        #     CONN.commit()
 
-        # 1 m = 0.00062 miles
-        # If dist is < 100 miles add this point to the user_alert_log and set need_to_alert value to True
-        if (dist*0.00062) < 100 and not already_alerted:
-            sql = '''INSERT INTO goesFire_profile 
-                        (user_id, alerted_incident_id, alert_time, need_to_alert, dist_to_fire, fire_lng, fire_lat) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?)'''
-            CURSOR.execute(sql, [userID, fire_id,
-                                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True, int(dist*0.00062),
-                                 pt[0], pt[1]])
-            CONN.commit()
-
-    # Test if GOES detected any hotspots within range of user
+    # Test if any new CalFires have been identified that have NOT been picked up by the GOES satellite.
     for pt in calfirell:
-        ll = Point(pt[:-1])  # Latlng of Cal Fire point
         cfID = pt[2]  # The incident ID of the fire (given by CalFire)
 
-        # Check user has been alerted to this ID# The incident ID of the fire (given by CalFire)
-        sql = "SELECT need_to_alert FROM goesFire_profile " \
-              "WHERE user_id = ? AND alerted_cal_fire_incident_id = ?"
-        CURSOR.execute(sql, [userID, cfID])
-        already_alerted = CURSOR.fetchone()  # This will be None if not alerted to this ID yet
+        ca_dist_users = Profile.objects.with_distance(pt[0], pt[1], "miles") \
+            .filter(Q(distance_to_user__lt=F('user_radius')) | Q(distance_to_fav1__lt=F('fav1_radius')) |
+                    Q(distance_to_fav2__lt=F('fav2_radius')))
 
-        # Distance
-        geod = Geod(ellps='WGS84')
-        angle1, angle2, dist = geod.inv(ll.x, ll.y, userll.x, userll.y)
-        # Alert to any cal fire
-        if dist < 100000000 and not already_alerted:
-            sql = '''INSERT INTO goesFire_profile
-                        (user_id, alerted_cal_fire_incident_id, alert_time, 
-                        need_to_alert, dist_to_fire, fire_lng, fire_lat) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?)'''
-            CURSOR.execute(sql, [int(userID), cfID,
-                                 datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                 True, int(dist*0.00062), pt[0], pt[1]])
-            CONN.commit()
+        if ca_dist_users.exists():
+            for ca_usr in ca_dist_users:
+                # If the fire table has the this incident ID, then it identified the CalFire with a GOES fire pixel.
+                # and that info is stored in our database. If it the ID doesn't exist, that means CAL Fire ID'ed a
+                # fire that wasn't observed by the GOES satellite. That's a problem because now you don't have a
+                # lat lng stored in the database (may just start there to fix the issue)
+                e = GoesFireTable.objects.filter(cal_fire_incident_id=cfID).first()
+                if e is not None:
+                    alert, created = Alert.objects.get_or_create(fire_id=e.id, user_id=ca_usr.user.id)
 
-    # Check if any values for this user need to be alerted
-    sql_alert_count = "SELECT COUNT(*) FROM goesFire_profile WHERE user_id=? AND need_to_alert=1"
-    CURSOR.execute(sql_alert_count, [userID])
-    alert_num = list(CURSOR.fetchone())[0]
-    return alert_num
+                # This is a new CalFire and it HAS NOT been observed by GOES. THIS SHOULD BE RARE!
+                else:
+                    alert, created = Alert.objects.get_or_create(fire_id=None,
+                                                                 user_id=ca_usr.user.id,
+                                                                 alerted_cal_fire_incident_id=cfID,
+                                                              )
+                if created:
+                    print(f"New Alert Created For:  {ca_usr.user}")
+
+    alerts = Alert.objects.filter(need_to_alert=True)
+    for alert in alerts:
+        user_alerts = Alert.objects.filter(need_to_alert=True, user_id=alert.user_id)
+        msg = f'Alert: {user_alerts.count} New Fire Detected: '
+        if user_alerts.count > 1:
+            msg = f'Alert: {user_alerts.count} New Fires Detected: '
+        i = 0
+        for user_alert in user_alerts:
+            i += 1
+            msg = msg + f"\nFire #{i}: {user_alert.dist_to_fire} miles from {user_alert.closest_saved_location}"
+
+        msg = msg + f"\n More Info: URL goes HERE"
+    print(msg)
+    #Alert.objects.filter(need_to_alert=True).update(need_to_alert=False)
+    return
 
 
 def forced_loop_creator(goes_multiband, center_lnglat, bucket, s3, starting_time, hours_of_data):
@@ -1010,5 +998,7 @@ def append_db(data, conn):
 
 if __name__ == "__main__":
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
+    #alert, created = Alert.objects.get_or_create(user_id=1,
+    #                                             alerted_cal_fire_incident_id='c9bb59f7-be32-4296-8c11-3f1233116827')
     main()
     t1.start(block=True)
