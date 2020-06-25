@@ -127,7 +127,7 @@ class Profile(models.Model):
     fav1_radius = models.IntegerField(null=True, blank=True, default=50)
     fav2_radius = models.IntegerField(null=True, blank=True, default=50)
     last_alert = models.DateTimeField(null=True, blank=True)
-    alerted_calfire_incident_id = models.TextField(null=True, blank=True)
+    calfire_incident_id = models.TextField(null=True, blank=True)
     #need_to_alert = models.IntegerField(null=True, blank=True)
     dist_to_fire = models.FloatField(null=True, blank=True)
     alert_time = models.FloatField(null=True, blank=True)
@@ -173,7 +173,7 @@ class CAfire(models.Model):
     incident_date_extinguished = models.TextField(null=True, blank=True)
     incident_dateonly_extinguished = models.TextField(null=True, blank=True)
     incident_dateonly_created = models.TextField(null=True, blank=True)
-    is_active = models.CharField(null=True, blank=True)
+    is_active = models.CharField(null=True, blank=True, max_length=20)
 
     @classmethod
     def calFire_info(cls, id):
@@ -224,7 +224,7 @@ class Alert(models.Model):
     dist_to_fire = models.FloatField(null=True)
     alert_time = models.DateTimeField(null=True)
     need_to_alert = models.BooleanField(null=True)
-    alerted_cal_fire_incident_id = models.CharField(max_length=200,null=True, blank=True)
+    cal_fire_incident_id = models.CharField(max_length=200,null=True, blank=True)
     closest_saved_location = models.CharField(max_length=200,null=True, blank=True)
 
     def distance_to_fire(self):
@@ -255,7 +255,7 @@ class Alert(models.Model):
         if self.fire_id is not None:
             radlat = math.radians(self.fire_id.lat)  # given latitude
             radlong = math.radians(self.fire_id.lng)  # given longitude
-        elif self.alerted_cal_fire_incident_id is not None:
+        elif self.cal_fire_incident_id is not None:
             radlat = math.radians(self.calFire.incident_latitude)  # given latitude
             radlong = math.radians(self.calFire.incident_longitude)  # given longitude
 
@@ -274,6 +274,7 @@ class Alert(models.Model):
             if user_dist < self.user.profile.user_radius:
                 alert = True
                 loc = "Current Position"
+                # Start off assuming this saved position is the closest.
                 closest_location = user_dist
 
         # If the user has a fav1 position saved, find the distance from the fire to that point.
@@ -285,6 +286,7 @@ class Alert(models.Model):
                                              math.sin(radlat) * math.sin(radflat_fav1))
             if fav1_dist < self.user.profile.fav1_radius:
                 alert = True
+                # Test if this is now the closest location to the point
                 if fav1_dist < closest_location:
                     closest_location = fav1_dist
                     loc = self.user.profile.fav1_desc
@@ -299,6 +301,7 @@ class Alert(models.Model):
 
             if fav2_dist < self.user.profile.fav2_radius:
                 alert = True
+                # Test if this is now the closest location to the point
                 if fav2_dist < closest_location:
                     loc = self.user.profile.fav2_desc
                     closest_location = fav2_dist
@@ -309,23 +312,23 @@ class Alert(models.Model):
         # In most cases, we will not have a CalFire ID because the GOES-R will ID the fire first. However, if
         # we do have a CalFire ID associated with this, then go ahead and grab all the CalFire information associated
         # with that ID from the "CAfire" class object.
-        if self.alerted_cal_fire_incident_id is not None:
-            self.calFire = CAfire.calFire_info(self.alerted_cal_fire_incident_id)
+        if self.cal_fire_incident_id is not None:
+            self.calFire = CAfire.calFire_info(self.cal_fire_incident_id)
 
         # The else case is basically going to give it a value of None.
         else:
-            self.alerted_cal_fire_incident_id = self.fire_id.cal_fire_incident_id
+            self.cal_fire_incident_id = self.fire_id.cal_fire_incident_id
         self.alert_time = datetime.now()
         try:
             distance_info = self.distance_to_fire()
             self.need_to_alert = distance_info[0]
-            self.closest_saved_location = distance_info[1]
-            self.dist_to_fire = distance_info[2]
+            self.dist_to_fire = distance_info[1]
+            self.closest_saved_location = distance_info[2]
         except:
             print("WARNING! Can Not Calculate Distance To Fire. Is Lat/Lng Info Avail?")
         finally:
             distance_info = None
         if self.fire_id is not None:
-            self.fire_id = self.fire_id.fire_id
+            self.fire_id_id = self.fire_id.fire_id
         super(Alert, self).save(*args, **kwargs)
 

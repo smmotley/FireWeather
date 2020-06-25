@@ -4,6 +4,7 @@ django.setup()
 from pyproj import Proj, Geod, transform
 from functools import partial
 from datetime import datetime, timedelta
+import pytz
 import sqlite3
 import os, io, time, sys
 import pandas as pd
@@ -18,21 +19,23 @@ import shapely, shapely.ops
 from shapely.geometry import Point, MultiPoint
 import json
 import logging
-from django.conf import settings
 from django.db.models import F, Q, Max, Min
-from goesFire.models import Profile, Alert, GoesFireTable, CAfire
+from goesFire.models import Profile, Alert, GoesFireTable, CAfire, FdfcFiles, GoesImages
 from django.db import connection, IntegrityError
-from django.core.mail import send_mail
 from GOES_Image_Creator import Fire_Image
 from noaa_aws import AwsGOES
 from timeloop import Timeloop
-#import mailer
+import mailer
+import warnings
+
+warnings.filterwarnings("ignore")
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'FireWeather.settings'
 logging.basicConfig(filename='logfile.log',level=logging.ERROR)
 t1 = Timeloop()
 GOES_NUMBER = '17'
-debugging = True
+debugging = False
+create_images = True
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db.sqlite3')
 CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
 CURSOR = CONN.cursor()
@@ -158,14 +161,14 @@ def main():
         if debugging:
             import netCDF4 as nc
             Cf = nc.Dataset('../ABI_fire.nc', 'r')
-        # Cf = goes_hotspot.download_file(ALL_FILES[FILE], goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
+        Cf = goes_hotspot.download_file(ALL_FILES[FILE], goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
         # Cf = goes_hotspot.download_file('ABI-L2-FDCF/2019/218/17/OR_ABI-L2-FDCF-M6_G17_s20192181720341_e20192181729408_c20192181729505.nc', goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
 
         # Timestamp on Fire Characterization / Hotspot detection file.
         fdfc_seconds = int(np.ma.round(Cf.variables['t'][0], decimals=0))
 
         # Times reported in seconds since 2000-01-01 12:00:00
-        fdfc_DATE = datetime(2000, 1, 1, 12) + timedelta(seconds=fdfc_seconds)
+        fdfc_DATE = datetime(2000, 1, 1, 12, tzinfo=pytz.UTC) + timedelta(seconds=fdfc_seconds)
 
         # The lat / lng of GOES-R detected hotspots
         fire_latlng, xres, yres = fire_pixels(Cf)
@@ -185,64 +188,94 @@ def main():
 
         # Push any new incident IDs (GOES detected or CAL_Fire) into alert database. This will also return
         # the value of any new fires that a particular user needs to be alerted to.
-        new_fires = update_alertDB(loop_duration=hours_of_data, user_email='smotley@mac.com')
+        new_fires = update_alertDB(loop_duration=hours_of_data)
 
         # Update the database to reflect the fact the current FDFC file has been examined.
-        sql = '''INSERT INTO goesFire_fdfcfiles
-                            (s3_filename_fdfc, s3_filename_multiband, scan_dt_fdfc, new_fires) 
-                            VALUES (?, ?, ?, ?)'''
-        CURSOR.execute(sql, [ALL_FILES[FILE], FILE, fdfc_DATE, new_fires])
-        CONN.commit()
+        obj, created = FdfcFiles.objects.get_or_create(s3_filename_fdfc=ALL_FILES[FILE],
+                                                           s3_filename_multiband=FILE,
+                                                           scan_dt_fdfc=fdfc_DATE,
+                                                           new_fires=new_fires)
 
+        # Alert users before the long process of downloading and creating images begins.
         if new_fires > 0:
             print("New Fire Detected, Setting up alert...")
+            alert_user()
+
+        if create_images:
+            C = goes_multiband.download_file(FILE,
+                                             goes_multiband.bucket,
+                                             s3)  # NETCDF File containing multiband GOES data
+
+            # Seconds since 2000-01-01 12:00:00
+            add_seconds = int(np.ma.round(C.variables['t'][0], decimals=0))
+            DATE = datetime(2000, 1, 1, 12, tzinfo=pytz.UTC) + timedelta(seconds=add_seconds)
+
+            # Timestamp difference between the GOES multiban scan and the GOES Fire detection scan. This should be < 6 min.
+            scan_diff = abs(fdfc_DATE - DATE).seconds / 60
+
+            print(f"DATE OF FDFC FILE: {fdfc_DATE}\n"
+                  f"DATE OF MULTIBAND FILE: {DATE}\n"
+                  f"MINUTES BETWEEN FILES:{scan_diff}")
+
+            if scan_diff > 1:
+                logging.info("Duration between GOES mutiband and GOES Hotspot detection scan is " +
+                             str(scan_diff) + " minutes.")
+
+            goes_firetemp_img(C, [38.59,-121.41], FILE, None, False)
+            # The idea here, was to get the fire ID that the user is alerted on, and make an mp4 for that user
+            # to see in the text. To make the mp4, the code would get all images from the past hour (downloading
+            # additional images if some where missed) and combine the images into an mp4). This is kind of a dumb
+            # idea for multiple users, since every single user would need a custom image set for them. Therefore,
+            # a better alternative is to either 1) provide a url for more info or 2) include an image that's already
+            # avaliable on the webpage.
 
             # Info needed for a new fire includes the fire's location and incident id number (either our id or CA_fire)
-            sql = '''SELECT fire_lng, fire_lat, alerted_incident_id, alerted_cal_fire_incident_id 
-                         FROM goesFire_profile WHERE user_id = 1 AND need_to_alert = 1'''
-            CURSOR.execute(sql)
-            resp = list(CURSOR.fetchall())
-            map_lnglat = [item[0:2] for item in resp]
-            fire_id = [item[2] for item in resp if item][-1]
-            if not fire_id:
-                fire_id = [item[3] for item in resp if item][-1]
+            if False:
+                sql = '''SELECT fire_lng, fire_lat, alerted_incident_id, alerted_cal_fire_incident_id 
+                             FROM goesFire_profile WHERE user_id = 1 AND need_to_alert = 1'''
+                CURSOR.execute(sql)
+                resp = list(CURSOR.fetchall())
+                map_lnglat = [item[0:2] for item in resp]
+                fire_id = [item[2] for item in resp if item][-1]
+                if not fire_id:
+                    fire_id = [item[3] for item in resp if item][-1]
 
-            # A list of files already downloaded into the database and processed into .png images.
-            CURSOR.execute("SELECT s3_filename FROM goesFire_goesimages WHERE fire_id = ?", [fire_id])
-            already_downloaded = [item[0] for item in list(CURSOR.fetchall())]
+                # A list of files already downloaded into the database and processed into .png images.
+                CURSOR.execute("SELECT s3_filename FROM goesFire_goesimages WHERE fire_id = ?", [fire_id])
+                already_downloaded = [item[0] for item in list(CURSOR.fetchall())]
 
-            # To create an mp4 loop that is "hours_of_data" in length, we first need to get all the file names
-            # of the multiband files.
-            mp4_files = AwsGOES(
-                    bands=[7,8],
-                    bucket=bucket,
-                    st_dt=fdfc_DATE.strftime("%m/%d/%Y %H:%M"),
-                    hrs=hours_of_data).bucket_files
+                # To create an mp4 loop that is "hours_of_data" in length, we first need to get all the file names
+                # of the multiband files.
+                mp4_files = AwsGOES(
+                        bands=[7,8],
+                        bucket=bucket,
+                        st_dt=fdfc_DATE.strftime("%m/%d/%Y %H:%M"),
+                        hrs=hours_of_data).bucket_files
 
-            # If the file isn't in our database yet, go download it.
-            for mp4_file in (mp4_file for mp4_file in mp4_files if mp4_file not in already_downloaded):
-            #for mp4_file in mp4_files:
-                # Download multiband netcdf file
-                C = goes_multiband.download_file(mp4_file, goes_multiband.bucket, s3)     # NETCDF File containing multiband GOES data
+                # If the file isn't in our database yet, go download it.
+                for mp4_file in (mp4_file for mp4_file in mp4_files if mp4_file not in already_downloaded):
+                #for mp4_file in mp4_files:
+                    # Download multiband netcdf file
+                    C = goes_multiband.download_file(mp4_file, goes_multiband.bucket, s3)     # NETCDF File containing multiband GOES data
 
-                # Seconds since 2000-01-01 12:00:00
-                add_seconds = int(np.ma.round(C.variables['t'][0], decimals=0))
-                DATE = datetime(2000, 1, 1, 12) + timedelta(seconds=add_seconds)
+                    # Seconds since 2000-01-01 12:00:00
+                    add_seconds = int(np.ma.round(C.variables['t'][0], decimals=0))
+                    DATE = datetime(2000, 1, 1, 12) + timedelta(seconds=add_seconds)
 
-                # Timestamp difference between the GOES multiban scan and the GOES Fire detection scan. This should be < 6 min.
-                scan_diff = abs(fdfc_DATE - DATE).seconds / 60
+                    # Timestamp difference between the GOES multiban scan and the GOES Fire detection scan. This should be < 6 min.
+                    scan_diff = abs(fdfc_DATE - DATE).seconds / 60
 
-                print(f"DATE OF FDFC FILE: {fdfc_DATE}\n"
-                      f"DATE OF MULTIBAND FILE: {DATE}\n"
-                      f"MINUTES BETWEEN FILES:{scan_diff}")
+                    print(f"DATE OF FDFC FILE: {fdfc_DATE}\n"
+                          f"DATE OF MULTIBAND FILE: {DATE}\n"
+                          f"MINUTES BETWEEN FILES:{scan_diff}")
 
-                if scan_diff > 1:
-                    logging.info("Duration between GOES mutiband and GOES Hotspot detection scan is " +
-                                           str(scan_diff) + " minutes.")
+                    if scan_diff > 1:
+                        logging.info("Duration between GOES mutiband and GOES Hotspot detection scan is " +
+                                               str(scan_diff) + " minutes.")
 
-                # Create a true color image and store the png file in the database.
-                goes_firetemp_img(C, map_lnglat, mp4_file, fire_id, False)
-            alert_user(new_fires, 1, fdfc_DATE, fire_id)
+                    # Create a true color image and store the png file in the database.
+                    goes_firetemp_img(C, map_lnglat, mp4_file, fire_id, False)
+                #alert_user(new_fires, 1, fdfc_DATE, fire_id)
         else:
             print("No New Fires Found For: " + fdfc_DATE.strftime("%m/%d/%Y %H:%M"))
     print("COMPLETE!")
@@ -518,7 +551,7 @@ def fire_pixels(C):
     return ca_fire_pts, xres, yres
 
 
-def goes_firetemp_img(C, ca_fire_latlng, FILE, fire_id, only_RGB=False):
+def goes_firetemp_img(C, map_center_latlng, FILE, fire_id, only_RGB=False):
     composite_img = Fire_Image(C=C, fileName=FILE).Composite
 
     # Scan's start time, converted to datetime object
@@ -550,8 +583,8 @@ def goes_firetemp_img(C, ca_fire_latlng, FILE, fire_id, only_RGB=False):
 
 
     # Location of latest firepoint
-    l = {'latitude': ca_fire_latlng[-1][1],
-         'longitude': ca_fire_latlng[-1][0]}
+    l = {'latitude': map_center_latlng[0],
+         'longitude': map_center_latlng[1]}
 
     # Draw zoomed map
     m = Basemap(resolution='i', projection='cyl', area_thresh=50000, llcrnrlon=l['longitude'] - 2,
@@ -593,13 +626,15 @@ def goes_firetemp_img(C, ca_fire_latlng, FILE, fire_id, only_RGB=False):
     #     fire_circle = Circle(xy=m(x, y), radius=0.25, fill=False, color='g', linewidth=1)
     #     plt.gca().add_patch(fire_circle)
 
-    x2, y2 = m([i[0] for i in ca_fire_latlng], [i[1] for i in ca_fire_latlng])
+
     # PLACE RED DOT ON CENTER POINT OF OF VALID PIXEL
     #m.plot(x2, y2, 'ro', markersize=2)
 
-    for x2, y2 in zip(x2,y2):
-        fire_circle = Circle(xy=m(x2, y2), radius=0.2, fill=False, color='r', linewidth=2)
-        plt.gca().add_patch(fire_circle)
+    # PUT CIRCLE AROUND FIRE PIXELS
+    # x2, y2 = m([i[0] for i in map_center_latlng], [i[1] for i in map_center_latlng])
+    # for x2, y2 in zip(x2,y2):
+    #     fire_circle = Circle(xy=m(x2, y2), radius=0.2, fill=False, color='r', linewidth=2)
+    #     plt.gca().add_patch(fire_circle)
 
     buf = io.BytesIO()
     plt.savefig(buf, bbox_inches='tight', format='png')
@@ -608,9 +643,10 @@ def goes_firetemp_img(C, ca_fire_latlng, FILE, fire_id, only_RGB=False):
 
     # Store image into database
     ablob = buf.getvalue()
-    sql = '''INSERT INTO goesFire_goesimages (fire_temp_image, scan_dt, s3_filename, fire_id) VALUES (?, ?, ?, ?)'''
-    CONN.execute(sql, [ablob, DATE, FILE, fire_id])
-    CONN.commit()
+    obj, created = GoesImages.objects.get_or_create(scan_dt=DATE, fire_temp_image=ablob, s3_filename=FILE)
+    if created:
+        print("New Image Saved")
+
     buf.close()
 
     #extract_picture('2018-11-08 15:03:37')
@@ -638,7 +674,7 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
                     we could simply hard code the value in (it should be around 1000 meters), but we use it in the
                     function below to limit the acceptable distance of a given fire point to an ID'd fire from CALFire.
     :param yres:    Same as xres but in the y dir
-    :return:        
+    :return:
     """
     fire_pts = [{"lat": ll[1], "lng":ll[0], "fire_id": nan, "scan_dt": DATE, "s3_filename":FILE} for ll in fire_ll]
     fire_group_num = max_group_id
@@ -668,7 +704,7 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
 
         # Get all points in database that are within 2 miles of this point, but also > 0 (don't want same point).
         closest_points = GoesFireTable.objects.fire_pixel_dist(ll[0], ll[1]) \
-            .filter(distance__lt=(xres * 10), distance__gt=0)
+            .filter(distance__lt=(2), distance__gt=0)
 
         # ************** (CASE 1) fire_id = +1 **************
         # No close points in the entire database were found, give the current point a new fire_id.
@@ -687,7 +723,7 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
             closest_pt_ids = closest_points.order_by().values_list('fire_id', flat=True).distinct()
 
             # Change any "None" values to nan so that we can update any nan values in the DB
-           # closest_pt_ids = np.array(list(closest_pt_ids), dtype=np.float).tolist()
+            # closest_pt_ids = np.array(list(closest_pt_ids), dtype=np.float).tolist()
 
             # ************** CASE 3) merged fire --> fire_id still = closest fire_id ***************
             # There are multiple ID's that are close to this point, that means this pixel is merging two fires.
@@ -706,7 +742,6 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
         except IntegrityError as e:
             print("This point is already in the database --> \n " + e.args[0])
 
-
     # Now all of our fires have an ID associated with them. Let's now check every point that doesn't have a
     # CAL fire ID associated with it to see if there are any CAL fires close enough to be associated with that fire.
 
@@ -717,7 +752,7 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
 
         # Get all points in database that are within 4 miles of this point.
         closest_fire_pixels = GoesFireTable.objects.fire_pixel_dist(latitude=ca_lat, longitude=ca_lng) \
-            .filter(distance__lt=(xres * 20))
+            .filter(distance__lt=(4))
 
         # Get any fire ID that is close to this point.
         closest_fire_ids = closest_fire_pixels.order_by().values_list('fire_id', flat=True).distinct()
@@ -727,62 +762,88 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
             update_calfire_ids = GoesFireTable.objects.filter(fire_id__in=list(closest_fire_ids))
             update_calfire_ids.update(cal_fire_incident_id=calfire.incident_id)
             print(f"A Cal Fire incident {calfire.incident_id} was reported close to a GOES pixel id "
-                  f"{closest_pt_ids[0]}")
+                  f"{closest_fire_ids[0]}")
 
     return
 
-def alert_user(alert_num, userID, st_time, fire_id):
-    sql = "SELECT * FROM goesFire_profile WHERE user_id = ?"
-    df = pd.read_sql(sql, CONN, params=[userID])
-    email_text = f"A total of {alert_num} new incidents have been reported. \n \n"
-    for idx, row in df.iterrows():
-        if row['need_to_alert']:
-            if row['alerted_incident_id'] is not None:
-                email_text += f"This is a GOES-R detected fire " \
-                    f"{int(row['dist_to_fire'])} miles away from your saved location. \n \n"
 
-                sql_update = "UPDATE goesFire_profile SET need_to_alert=FALSE WHERE user_id=? AND alerted_incident_id=?"
-                CURSOR.execute(sql_update, [userID, row['alerted_incident_id']])
-                CONN.commit()
-            if row['alerted_cal_fire_incident_id'] is not None:
-                sql = "SELECT * FROM goesFire_cafire WHERE incident_id = ?"
-                df_calfire = pd.read_sql(sql, CONN, params=[row['alerted_cal_fire_incident_id']])
+def alert_user():
+    # Users Needing Alerts.
+    ualert = Alert.objects.filter(need_to_alert=True).values('user_id').distinct()
+    for user in ualert:
+        user_alerts = Alert.objects.filter(user_id=user['user_id'], need_to_alert=True)
+        msg = "New Fire Detected \n"
+        if user_alerts.count() > 1:
+            msg = f"{user_alerts.count()} New Fires Detected \n"
+        i = 1
+        for fire in user_alerts:
+            source = "GOES Satellite"
+            url_info = ""
+            if fire.cal_fire_incident_id is not None:
+                cal_fire_obj = CAfire.objects.filter(incident_id=fire.cal_fire_incident_id)
+                source = "Cal Fire"
+                url_info = cal_fire_obj[0].incident_url
+            msg = msg + f"Fire #{i} is {int(fire.dist_to_fire)} miles from {fire.closest_saved_location} \n" \
+                        f"Source: {source} \n\n"
+            i += 1
+        # SEND EMAIL FOR THIS USER HERE
+        print("Sending Email...")
+        mailer.send_mail(None, msg)
+        # PUT: "CURRENT WINDS, HUMIDITY, FIRE_SPREAD_RATE" AT SOURCE
+        user_alerts.update(need_to_alert=False)
+        print("Email Sent!")
 
-                email_text += f"This is a Cal Fire Reported Incident created on {df_calfire['incident_date_created'][0]}. " \
-                    f"\n The fire is {int(row['dist_to_fire'])} miles away from your saved location." \
-                    f"\n Current size of fire is: {df_calfire['incident_acres_burned'][0]} acres. Containment =  " \
-                    f"{df_calfire['incident_containment'][0]}% \n" \
-                    f"Additional Information: {df_calfire['incident_url'][0]} \n \n"
-
-
-                sql_update = "UPDATE goesFire_profile SET need_to_alert=0 " \
-                             "WHERE user_id=? AND alerted_cal_fire_incident_id=?"
-                CURSOR.execute(sql_update, [userID, row['alerted_cal_fire_incident_id']])
-                CONN.commit()
-
-    # All alerts for this user should now be false, double check to make sure.
-    sql_update = "SELECT * FROM goesFire_profile WHERE need_to_alert=1 " \
-                 "AND user_id=?"
-    CURSOR.execute(sql_update, [userID])
-    if len(list(CURSOR.fetchall())) != 0:
-        logging.CRITICAL("USERS ALERTS ARE NOT RESETTING!!")
-        sql_update = "UPDATE goesFire_profile SET need_to_alert=0 " \
-                     "WHERE user_id=? AND need_to_alert=1"
-        CURSOR.execute(sql_update, [str(userID)])
-        CONN.commit()
-
-    create_mp4(CONN, st_time, fire_id, loop_hours=1)
-    sql = "SELECT fire_temp_gif, MAX(scan_dt) FROM goesFire_goesimages WHERE fire_temp_gif NOT NULL"
-    CURSOR.execute(sql)
-    ablob = CURSOR.fetchone()
-    filename = 'fire_latest.mp4'
-    fpath = os.path.join(os.path.dirname(os.path.realpath(__file__)),filename)
-    with open(fpath, 'wb') as output_file:
-        output_file.write(ablob[0])
-        print("SENDING EMAIL...")
-        #mailer.send_mail(filename, email_text)
-        print("EMAIL SENT...")
-    return filename
+    # sql = "SELECT * FROM goesFire_profile WHERE user_id = ?"
+    # df = pd.read_sql(sql, CONN, params=[userID])
+    # email_text = f"A total of {alert_num} new incidents have been reported. \n \n"
+    # for idx, row in df.iterrows():
+    #     if row['need_to_alert']:
+    #         if row['alerted_incident_id'] is not None:
+    #             email_text += f"This is a GOES-R detected fire " \
+    #                 f"{int(row['dist_to_fire'])} miles away from your saved location. \n \n"
+    #
+    #             sql_update = "UPDATE goesFire_profile SET need_to_alert=FALSE WHERE user_id=? AND alerted_incident_id=?"
+    #             CURSOR.execute(sql_update, [userID, row['alerted_incident_id']])
+    #             CONN.commit()
+    #         if row['alerted_cal_fire_incident_id'] is not None:
+    #             sql = "SELECT * FROM goesFire_cafire WHERE incident_id = ?"
+    #             df_calfire = pd.read_sql(sql, CONN, params=[row['alerted_cal_fire_incident_id']])
+    #
+    #             email_text += f"This is a Cal Fire Reported Incident created on {df_calfire['incident_date_created'][0]}. " \
+    #                 f"\n The fire is {int(row['dist_to_fire'])} miles away from your saved location." \
+    #                 f"\n Current size of fire is: {df_calfire['incident_acres_burned'][0]} acres. Containment =  " \
+    #                 f"{df_calfire['incident_containment'][0]}% \n" \
+    #                 f"Additional Information: {df_calfire['incident_url'][0]} \n \n"
+    #
+    #
+    #             sql_update = "UPDATE goesFire_profile SET need_to_alert=0 " \
+    #                          "WHERE user_id=? AND alerted_cal_fire_incident_id=?"
+    #             CURSOR.execute(sql_update, [userID, row['alerted_cal_fire_incident_id']])
+    #             CONN.commit()
+    #
+    # # All alerts for this user should now be false, double check to make sure.
+    # sql_update = "SELECT * FROM goesFire_profile WHERE need_to_alert=1 " \
+    #              "AND user_id=?"
+    # CURSOR.execute(sql_update, [userID])
+    # if len(list(CURSOR.fetchall())) != 0:
+    #     logging.CRITICAL("USERS ALERTS ARE NOT RESETTING!!")
+    #     sql_update = "UPDATE goesFire_profile SET need_to_alert=0 " \
+    #                  "WHERE user_id=? AND need_to_alert=1"
+    #     CURSOR.execute(sql_update, [str(userID)])
+    #     CONN.commit()
+    #
+    # create_mp4(CONN, st_time, fire_id, loop_hours=1)
+    # sql = "SELECT fire_temp_gif, MAX(scan_dt) FROM goesFire_goesimages WHERE fire_temp_gif NOT NULL"
+    # CURSOR.execute(sql)
+    # ablob = CURSOR.fetchone()
+    # filename = 'fire_latest.mp4'
+    # fpath = os.path.join(os.path.dirname(os.path.realpath(__file__)),filename)
+    # with open(fpath, 'wb') as output_file:
+    #     output_file.write(ablob[0])
+    #     print("SENDING EMAIL...")
+    #     #mailer.send_mail(filename, email_text)
+    #     print("EMAIL SENT...")
+    return
 
 
 def extract_gif(scan_time):
@@ -823,117 +884,47 @@ def create_mp4(conn, scan_time, fire_id, loop_hours):
     return
 
 
-def update_alertDB(loop_duration, user_email):
+def update_alertDB(loop_duration):
     past_hour = datetime.utcnow() - timedelta(hours=loop_duration)
     if debugging:
         past_hour = datetime.utcnow() - timedelta(hours=100)
 
     # List of all GOES detected hotspots in the last hour.
-    sql = "SELECT lng, lat, fire_id FROM goesFire_goesfiretable WHERE scan_dt >= ?"
-    CURSOR.execute(sql, [past_hour])
-    respGoesF = list(CURSOR.fetchall())
-
-    # List of all the active CAL FIRE incidents.
-    sql = "SELECT incident_longitude, incident_latitude, incident_id FROM goesFire_cafire WHERE is_active == 'Y'"
-    CURSOR.execute(sql)
-
-    # LatLng list of every active CalFire incident.
-    calfirell = list(CURSOR.fetchall())
-
-    # Get the coordinates of the user you're interested in alerting.
-    sql = "SELECT profile.user_lng, profile.user_lat, profile.user_id " \
-          "FROM goesFire_profile AS profile "
-          #"LEFT JOIN auth_user AS u on profile.user_id = u.id WHERE u.email == ?"
-    #CURSOR.execute(sql, [user_email])
-    CURSOR.execute(sql)
-    respUsers = list(CURSOR.fetchall())
-
-    # arr = np.array(respUsers)
-    # Latlng of user turned into Point cords
-    #userll = Point(respUsers[0][:-1])
-
-    #fire_dist = Profile.objects.with_distance(-120, 39.9, "miles").filter(distance_to_user__lt=F('user_radius'))
-    #test = Profile.objects.with_distance(-120, 39.9, "miles")
-    #test2 = list(test.filter(distance_to_user__lt=200))
-    # User ID number
-    userID = respUsers[0][2]
-
-    # Did GOES detect any hotspots within range of user
-    #for pt in [(-120.2,38.7,1)]:
-    for pt in respGoesF:
-        dist_to_users = Profile.objects.with_distance(pt[0],pt[1], "miles")\
+    gPts = GoesFireTable.objects.filter(scan_dt__gte=past_hour)
+    for pt in gPts:
+        dist_to_users = Profile.objects.with_distance(latitude=pt.lat, longitude=pt.lng, units="miles") \
             .filter(Q(distance_to_user__lt=F('user_radius')) | Q(distance_to_fav1__lt=F('fav1_radius')) |
                     Q(distance_to_fav2__lt=F('fav2_radius')))
 
+        # If at least one match was found
         if dist_to_users.exists():
             for usr in dist_to_users:
-                alert, created = Alert.objects.get_or_create(fire_id=pt[2], user_id=usr.user.id)
+                alert, created = Alert.objects.get_or_create(fire_id_id=pt.fire_id,
+                                                             user_id=usr.user.id,
+                                                             cal_fire_incident_id=pt.cal_fire_incident_id)
                 if created:
                     print(f"New Alert Created For:  {usr.user}")
 
-        # ll = Point(pt[:-1])  # Lat lng of point
-        # fire_id = pt[2]  # ID given to fire
-        #
-        # geod = Geod(ellps='WGS84')
-        # angle1, angle2, dist = geod.inv(ll.x, ll.y, userll.x, userll.y)  # Distance of user to fire in meters
-        #
-        # sql = "SELECT need_to_alert FROM goesFire_profile WHERE user_id = ? AND alerted_incident_id = ?"  # Check user has been alerted to this ID
-        # CURSOR.execute(sql, [userID, fire_id])
-        # already_alerted = CURSOR.fetchone()  # This will be None if not alerted yet.
-        #
-        # # 1 m = 0.00062 miles
-        # # If dist is < 100 miles add this point to the user_alert_log and set need_to_alert value to True
-        # if (dist*0.00062) < 100 and not already_alerted:
-        #     sql = '''INSERT INTO goesFire_profile
-        #                 (user_id, alerted_incident_id, alert_time, need_to_alert, dist_to_fire, fire_lng, fire_lat)
-        #                 VALUES (?, ?, ?, ?, ?, ?, ?)'''
-        #     CURSOR.execute(sql, [userID, fire_id,
-        #                          datetime.now().strftime('%Y-%m-%d %H:%M:%S'), True, int(dist*0.00062),
-        #                          pt[0], pt[1]])
-        #     CONN.commit()
-
-    # Test if any new CalFires have been identified that have NOT been picked up by the GOES satellite.
-    for pt in calfirell:
-        cfID = pt[2]  # The incident ID of the fire (given by CalFire)
-
-        ca_dist_users = Profile.objects.with_distance(pt[0], pt[1], "miles") \
-            .filter(Q(distance_to_user__lt=F('user_radius')) | Q(distance_to_fav1__lt=F('fav1_radius')) |
-                    Q(distance_to_fav2__lt=F('fav2_radius')))
-
-        if ca_dist_users.exists():
-            for ca_usr in ca_dist_users:
-                # If the fire table has the this incident ID, then it identified the CalFire with a GOES fire pixel.
-                # and that info is stored in our database. If it the ID doesn't exist, that means CAL Fire ID'ed a
-                # fire that wasn't observed by the GOES satellite. That's a problem because now you don't have a
-                # lat lng stored in the database (may just start there to fix the issue)
-                e = GoesFireTable.objects.filter(cal_fire_incident_id=cfID).first()
-                if e is not None:
-                    alert, created = Alert.objects.get_or_create(fire_id=e.id, user_id=ca_usr.user.id)
-
-                # This is a new CalFire and it HAS NOT been observed by GOES. THIS SHOULD BE RARE!
-                else:
+    # Test to make sure CAL fire didn't ID a fire that was missed by GOES.
+    cal_fires = CAfire.objects.filter(is_active='Y').values().distinct()
+    for ca_id in cal_fires:
+        # The fire was not ID'ed in our GoesFireTable DB
+        if not GoesFireTable.objects.filter(cal_fire_incident_id=ca_id['incident_id']).exists():
+            ca_dist_to_users = Profile.objects.with_distance(latitude=ca_id['incident_latitude'],
+                                                          longitude=ca_id['incident_longitude'],
+                                                          units="miles") \
+                .filter(Q(distance_to_user__lt=F('user_radius')) | Q(distance_to_fav1__lt=F('fav1_radius')) |
+                        Q(distance_to_fav2__lt=F('fav2_radius')))
+            # If at least one match was found
+            if ca_dist_to_users.exists():
+                for usr in ca_dist_to_users:
                     alert, created = Alert.objects.get_or_create(fire_id=None,
-                                                                 user_id=ca_usr.user.id,
-                                                                 alerted_cal_fire_incident_id=cfID,
-                                                              )
-                if created:
-                    print(f"New Alert Created For:  {ca_usr.user}")
+                                                                 user_id=usr.user.id,
+                                                                 cal_fire_incident_id=ca_id['incident_id'])
+                    if created:
+                        print(f"New Alert Created For:  {usr.user} Based on a CAL Fire IDed Fire.")
 
-    alerts = Alert.objects.filter(need_to_alert=True)
-    for alert in alerts:
-        user_alerts = Alert.objects.filter(need_to_alert=True, user_id=alert.user_id)
-        msg = f'Alert: {user_alerts.count} New Fire Detected: '
-        if user_alerts.count > 1:
-            msg = f'Alert: {user_alerts.count} New Fires Detected: '
-        i = 0
-        for user_alert in user_alerts:
-            i += 1
-            msg = msg + f"\nFire #{i}: {user_alert.dist_to_fire} miles from {user_alert.closest_saved_location}"
-
-        msg = msg + f"\n More Info: URL goes HERE"
-    print(msg)
-    #Alert.objects.filter(need_to_alert=True).update(need_to_alert=False)
-    return
+    return Alert.objects.filter(need_to_alert=True).count()
 
 
 def forced_loop_creator(goes_multiband, center_lnglat, bucket, s3, starting_time, hours_of_data):
@@ -998,6 +989,7 @@ def append_db(data, conn):
 
 if __name__ == "__main__":
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
+    #update_alertDB(100,None)
     #alert, created = Alert.objects.get_or_create(user_id=1,
     #                                             alerted_cal_fire_incident_id='c9bb59f7-be32-4296-8c11-3f1233116827')
     main()
