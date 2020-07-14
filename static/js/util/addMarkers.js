@@ -1,10 +1,23 @@
 import * as something_clicked from "./marker_clicked.js";
 
+// Event listeners for deleting a point:
+
+var el_fav1 = document.getElementsByClassName("delete_location_fav1");
+var el_fav2 = document.getElementsByClassName("delete_location_fav2");
+Array.from(el_fav1).forEach(function(element) {
+      element.addEventListener("click", () => delete_point('fav1'))
+    });
+
+Array.from(el_fav2).forEach(function(element) {
+      element.addEventListener("click", () => delete_point('fav2'))
+    });
 
 let geojson = {
     type: "FeatureCollection",
     features: [],
 };
+
+var popup = null
 
 function json2geojson(json){
     for (var i = 0; i < json.data.length; i++) {
@@ -86,6 +99,61 @@ export function fireMarkers(map){
                 el.id = 'fire_marker_' + feature.properties.id;
                 if (feature.properties.type != 'POWERHOUSE'){
                         el.style.backgroundImage = 'url(/static/images/map_markers/fire_marker.png)';
+                        el.style.width = '25px';
+                        el.style.height = '30px';
+                    }
+
+                let popup = new mapboxgl.Popup({
+                    offset: 25,
+                    closeButton: true,
+                    closeOnClick: true
+                }).setHTML(
+                    "    <div class=\"col s12 m6\">\n" +
+                    "      <div class=\"card\">\n" +
+                    "        <div class=\"card-image\"> <img src=\"data:image/png;base64," + goes_image + "\">\n" +
+                    "          <span class=\"card-title\">" + feature.properties.fire_name + "</span>\n" +
+                    "          <p>I am a very simple card. I am good at containing small bits of information.\n" +
+                    "          I am convenient because I require little markup to use effectively.</p>\n" +
+                    "        </div>\n" +
+                    "        <div class=\"card-action\">\n" +
+                    "          <a href=\" "+ feature.properties.fire_url +  "\">Additional Fire Info</a>\n" +
+                    "          <a href=\"#\">This is a link</a>\n" +
+                    "        </div>\n" +
+                    "      </div>\n" +
+                    "    </div>\n");
+
+                new mapboxgl.Marker(el)
+                        .setLngLat(feature.geometry.coordinates)
+                        .addTo(map)
+                        .setPopup(popup);
+                el.addEventListener('click', (e) =>
+                {
+                   let station_name = (e.target.id).split("_");
+                   //console.log(station_name);
+                   something_clicked.marker_clicked(station_name[1])
+                })
+                el.addEventListener('mouseover', (e) =>
+                {
+                   let station_name = (e.target.id).split("_");
+                   popup.addTo(map);
+                   //console.log(station_name);
+                })
+                el.addEventListener('mouseout', (e) =>
+                {
+                   let station_name = (e.target.id).split("_");
+                   popup.remove();
+                   //console.log(station_name);
+                })
+
+        });
+
+    goes_fire_pixels.features.forEach(function(feature){
+        // create a HTML element for each feature
+                var el = document.createElement('div');
+                el.className = 'goes_marker';
+                el.id = 'goes_marker_' + feature.properties.id;
+                if (feature.properties.type == 'goes_pixel'){
+                        el.style.backgroundImage = 'url(/static/images/map_markers/fire_marker_blue.png)';
                         el.style.width = '25px';
                         el.style.height = '30px';
                     }
@@ -265,9 +333,24 @@ var createGeoJSONCircle = function(center, radiusInKm, points) {
     };
 };
 
-export function userMarkers(map, point_data) {
+export function userMarkers(map, geolocation_data) {
     const elem = document.getElementById('location_modal');
     const instance = M.Modal.init(elem, {dismissible: false});
+    if (geolocation_data){
+        console.log(geolocation_data.geometry)
+        location_data.features.push({
+            "type": "Feature",
+            "geometry": {
+                "type": "Point",
+                "coordinates": geolocation_data.geometry.coordinates
+            },
+            "properties": {
+                "id": 'new_geolocation',
+                "radius": 50,
+                "description": geolocation_data.text
+            }
+            })
+        }
 
     //if (location_data.features.length > 3) {
     //    instance.open()
@@ -277,7 +360,6 @@ export function userMarkers(map, point_data) {
     //var pulsingDot = generate_pulsing_dot(map)
 
     location_data.features.forEach(function (feature) {
-        console.log(feature)
         var fLat = Math.round(feature.geometry.coordinates[1] * 1000) / 1000
         var fLng = Math.round(feature.geometry.coordinates[0] * 1000) / 1000
         var source_id = 'point' + feature.properties.id
@@ -289,45 +371,48 @@ export function userMarkers(map, point_data) {
         //map.addImage(image_id, pulsingDot, { pixelRatio: 2 });
 
         // create a HTML element for each feature
-        map.addSource(polygon_source_id, createGeoJSONCircle(feature.geometry.coordinates, feature.properties.radius*0.62));
+        if (!map.getSource(polygon_source_id)) {
+            map.addSource(polygon_source_id, createGeoJSONCircle(feature.geometry.coordinates, feature.properties.radius * 0.62));
 
-        map.addLayer({
-            "id": polygon_id,
-            "type": "fill",
-            "source": polygon_source_id,
-            "layout": {},
-            "paint": {
-                "fill-color": "blue",
-                "fill-opacity": 0.3
-            }
-            }
-           );
+            map.addLayer({
+                "id": polygon_id,
+                "type": "fill",
+                "source": polygon_source_id,
+                "layout": {},
+                "paint": {
+                    "fill-color": "blue",
+                    "fill-opacity": 0.3
+                }
+                }
+               );
+        }
 
-        map.addSource(source_id, {
-            'type': 'geojson',
-            'data': feature
-        });
+        if (!map.getSource(source_id)) {
+            map.addSource(source_id, {
+                'type': 'geojson',
+                'data': feature
+            });
 
-        map.addLayer({
-            'id': layer_id,
-            'type': 'circle',
-            'source': source_id,
-            /* // For Pulsing Dot
-            'type': 'symbol',
-            'layout': {
-                'icon-image': image_id
-            }
-             */
-            'paint': {
-                'circle-radius': 10,
-                'circle-color': '#0f4be3',
-                'circle-opacity': 0.7,
-                'circle-stroke-color': '#e8e2ec',
-                'circle-stroke-width': 2,
-                'circle-stroke-opacity': 0.5
-            }
-        });
-
+            map.addLayer({
+                'id': layer_id,
+                'type': 'circle',
+                'source': source_id,
+                /* // For Pulsing Dot
+                'type': 'symbol',
+                'layout': {
+                    'icon-image': image_id
+                }
+                 */
+                'paint': {
+                    'circle-radius': 10,
+                    'circle-color': '#0f4be3',
+                    'circle-opacity': 0.7,
+                    'circle-stroke-color': '#e8e2ec',
+                    'circle-stroke-width': 2,
+                    'circle-stroke-opacity': 0.5
+                }
+            });
+        }
         var popupHTML = "    <div class=\"card grey-box gradient-shadow\">\n" +
         "      <div class=\"card-content popup white-text\">\n" +
         "          <span class=\"card-title center-align no-margin\">" + feature.properties.description + "</span>\n" +
@@ -348,10 +433,16 @@ export function userMarkers(map, point_data) {
 
 
         map.on('click', layer_id, function (e) {
-            new mapboxgl.Popup()
+            popup = new mapboxgl.Popup()
                 .setLngLat(e.lngLat)
                 .setHTML(popupHTML)
-                .addTo(map);
+                .addTo(map)
+
+            var lngLatPop = [e.lngLat.lng, e.lngLat.lat]
+            coordinates.innerHTML =
+            '<b>Lng: </b>' + Math.round(lngLatPop[0] * 1000) / 1000 + '<b>Lat: </b>' +
+            Math.round(lngLatPop[1] * 1000) / 1000;
+
 
             var markerlngLat = [e.lngLat.lng, e.lngLat.lat]
             var slider = document.getElementById("marker_range");
@@ -367,6 +458,7 @@ export function userMarkers(map, point_data) {
                 map.getSource(polygon_source_id).setData(data.data)
                 feature.properties.radius = this.value
                 alertRadius.innerHTML = "</div><b>Alert Radius: " + this.value + " Miles</b> "
+                $("#add_new_point_"+feature.properties.id).addClass('pulse');
                 }
 
         });
@@ -374,7 +466,15 @@ export function userMarkers(map, point_data) {
         function onMove(e) {
             var coords = e.lngLat;
             var lngLat = [e.lngLat.lng, e.lngLat.lat]
+            if (popup.isOpen()){
+                popup.remove()          // Leaving the popup open was causing all kinds of problems
+                coordinates.innerHTML =
+            '<b>Lng: </b>' + Math.round(lngLat[0] * 1000) / 1000 + '<b>Lat: </b>' +
+            Math.round(lngLat[1] * 1000) / 1000;
+            }
+
             var data = createGeoJSONCircle(lngLat, (feature.properties.radius)*0.62)
+            popup.setLngLat(coords)
 
             // Set a UI indicator for dragging.
             canvas.style.cursor = 'grabbing';
@@ -384,9 +484,6 @@ export function userMarkers(map, point_data) {
             feature.geometry.coordinates = [coords.lng, coords.lat];
             map.getSource(source_id).setData(feature);
             map.getSource(polygon_source_id).setData(data.data)
-            coordinates.innerHTML =
-            '<b>Lng: </b>' + Math.round(lngLat[0] * 1000) / 1000 + '<b>Lat: </b>' +
-            Math.round(lngLat[1] * 1000) / 1000;
         }
 
         function onUp(e) {
@@ -513,72 +610,201 @@ function generate_pulsing_dot(map){
 
 
 export function new_geocoder_marker(map, ev) {
-    var evLat = Math.round(ev.result.center[1] * 1000) / 1000
-    var evLng = Math.round(ev.result.center[0] * 1000) / 1000
-    var popupHTML = "    <div class=\"card gradient-45deg-light-blue-cyan gradient-shadow\">\n" +
-        "      <div class=\"card-content white-text\">\n" +
-        "          <span class=\"card-title\">" + ev.result.text + "</span>\n" +
+    var geocoder_result = ev.result;
+    var radius = 50
+    var canvas = map.getCanvasContainer();
+    var fLat = Math.round(ev.result.center[1] * 1000) / 1000
+    var fLng = Math.round(ev.result.center[0] * 1000) / 1000
+    var source_id = 'point_new'
+    var layer_id = 'user_marker_new'
+
+    var polygon_source_id = 'poly_new'
+    var polygon_id = 'poly_marker_new'
+
+    var feature = {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [fLng, fLat]
+        },
+        "properties": {
+            "id": ev.result.text,
+            "radius": 50
+        }
+    }
+    //var image_id = 'user_dot_' + feature.properties.id
+    //map.addImage(image_id, pulsingDot, { pixelRatio: 2 });
+
+    // create a HTML element for each feature
+    map.addSource(polygon_source_id, createGeoJSONCircle([ev.result.center[0],ev.result.center[1]], 50*0.62));
+
+    map.addLayer({
+        "id": polygon_id,
+        "type": "fill",
+        "source": polygon_source_id,
+        "layout": {},
+        "paint": {
+            "fill-color": "blue",
+            "fill-opacity": 0.3
+        }
+        }
+       );
+
+    map.addSource(source_id, {
+        'type': 'geojson',
+        "data": {
+        "type": "Feature",
+        "geometry": {
+            "type": "Point",
+            "coordinates": [fLng, fLat]
+        },
+        "properties": {
+            "title": "New User Point",
+        }
+    }
+    });
+
+    map.addLayer({
+        'id': layer_id,
+        'type': 'circle',
+        'source': source_id,
+        /* // For Pulsing Dot
+        'type': 'symbol',
+        'layout': {
+            'icon-image': image_id
+        }
+         */
+        'paint': {
+            'circle-radius': 10,
+            'circle-color': '#0f4be3',
+            'circle-opacity': 0.7,
+            'circle-stroke-color': '#e8e2ec',
+            'circle-stroke-width': 2,
+            'circle-stroke-opacity': 0.5
+        }
+    });
+
+     var popupHTML = "    <div class=\"card grey-box gradient-shadow\">\n" +
+        "      <div class=\"card-content popup white-text\">\n" +
+        "          <span class=\"card-title center-align no-margin\">" + ev.result.text + "</span>\n" +
+        "           <div class=\"center-align\">Drag Marker To Adjust</div>\n" +
+        "           <div class=\"divider\"></div>\n" +
         "          <div id='coordinates' class='coordinates'>" +
-        "          <b>Longitude: </b>" + evLng + " <br><b>Latitude: </b>" + evLat + "<br>" +
-        "        </div>\n" +
-        "        <div class=\"card-action\">\n" +
-        "               <b>Drag to Adjust</b></div>\n" +
-        "          <button id=\"add_new_point\" class=\"btn indigo waves-effect waves-light mr-1\">Save New Location</button>\n" +
+        "               <b>Lng: </b>" + fLng + "    <b>Lat: </b>" + fLat  +
+        "          </div>" +
+        "           <div class=\"divider\"></div>\n" +
+        "          <div id='alertRadius'><b>Alert Radius: " + feature.properties.radius + " Miles</b>" +
+        "          </div>\n" +
+        "           <div class=\"range-field\">" +
+        "               <input type=\"range\" id=\"marker_range_new\" min=\"0\" max=\"600\"/>" +
+        "           </div>" +
+        "          <div class='center-align'><button id=\"add_new_point_"+feature.properties.id+ "\" class=\"btn-small indigo waves-effect waves-light\">Save Changes</button></div>\n" +
         "        </div>\n" +
         "      </div>\n"
 
-    let popup = new mapboxgl.Popup({
-        offset: 25,
-        closeButton: true,
-        closeOnClick: true
-    })
+
+    map.on('click', layer_id, function (e) {
+        popup = new mapboxgl.Popup()
+            .setLngLat(e.lngLat)
+            .setHTML(popupHTML)
+            .addTo(map)
 
 
-    var marker = new mapboxgl.Marker({
-        draggable: true,
-    })
-        .setLngLat(ev.result.center)
-        .setPopup(popup)
-        .addTo(map);
-
-    //You must bind the HTML this way, or the click event can't find the button (it doesn't exist in the DOM yet).
-    // And if you bind the submit, or onclick event to the HTML markup, it will trigger as soon as the popup is
-    // added to the map.
-    popup.on('open', () => {
-        popup.setHTML(popupHTML)
-        $('#add_new_point').on("click", e => {
-            addLocation(ev.result, null)
+        var markerlngLat = [e.lngLat.lng, e.lngLat.lat]
+        var slider = document.getElementById("marker_range_new");
+        console.log(slider)
+        document.getElementById("add_new_point_"+feature.properties.id)
+            .addEventListener("click", function (ev) {
+                 ev.preventDefault()
+                  addLocation(feature, null)
         })
+        //M.Range.init(slider)
+        slider.oninput = function() {
+                //output.innerHTML = this.value;
+            var data = createGeoJSONCircle(markerlngLat, (this.value)*0.62)
+            map.getSource(polygon_source_id).setData(data.data)
+            feature.properties.radius = this.value
+            alertRadius.innerHTML = "</div><b>Alert Radius: " + this.value + " Miles</b> "
+            }
 
-    })
-    popup.addTo(map);
+    });
 
-    function onDragEnd() {
-        var lngLat = marker.getLngLat();
-        coordinates.style.display = 'block';
-        coordinates.innerHTML =
-            '<b>Longitude: </b>' + Math.round(lngLat.lng * 1000) / 1000 + '<br/><b>Latitude: </b>' +
-            Math.round(lngLat.lat * 1000) / 1000;
-    }
+    function onMove(e) {
+            popup.remove()          // Leaving the popup open was causing all kinds of problems
+            var coords = e.lngLat;
+            var lngLat = [e.lngLat.lng, e.lngLat.lat]
+            var data = createGeoJSONCircle(lngLat, (feature.properties.radius)*0.62)
+            popup.setLngLat(coords)
 
-    marker.on('drag', onDragEnd);
-    document.getElementById("delete_location_fav1")
-        .addEventListener("click", function (e) {
-            e.preventDefault()
-            addLocation(ev.result, "fav1")
-        })
-    document.getElementById("delete_location_fav2")
-        .addEventListener("click", function (e) {
-            e.preventDefault()
-            addLocation(ev.result, "fav2")
-        })
+            // Set a UI indicator for dragging.
+            canvas.style.cursor = 'grabbing';
+
+            // Update the Point feature in `geojson` coordinates
+            // and call setData to the source layer `point` on it.
+            feature.geometry.coordinates = [coords.lng, coords.lat];
+            map.getSource(source_id).setData(feature);
+            map.getSource(polygon_source_id).setData(data.data)
+            coordinates.innerHTML =
+            '<b>Lng: </b>' + Math.round(lngLat[0] * 1000) / 1000 + '<b>Lat: </b>' +
+            Math.round(lngLat[1] * 1000) / 1000;
+        }
+
+        function onUp(e) {
+            var coords = e.lngLat;
+
+            // Print the coordinates of where the point had
+            // finished being dragged to on the map.
+            //coordinates.style.display = 'block';
+            //coordinates.innerHTML =
+            //'Longitude: ' + coords.lng + '<br />Latitude: ' + coords.lat;
+            canvas.style.cursor = '';
+
+            // Unbind mouse/touch events
+            map.off('mousemove', onMove);
+            map.off('touchmove', onMove);
+        }
+
+        // When the cursor enters a feature in the point layer, prepare for dragging.
+        map.on('mouseenter', 'user_marker_' + feature.properties.id, function () {
+            map.setPaintProperty('user_marker_' + feature.properties.id, 'circle-color', '#3bb2d0');
+            canvas.style.cursor = 'move';
+        });
+
+        map.on('mouseleave', 'user_marker_' + feature.properties.id, function () {
+            map.setPaintProperty('user_marker_' + feature.properties.id, 'circle-color', '#3887be');
+            canvas.style.cursor = '';
+        });
+
+        map.on('mousedown', 'user_marker_' + feature.properties.id, function (e) {
+            // Prevent the default map drag behavior.
+            e.preventDefault();
+
+            canvas.style.cursor = 'grab';
+
+            map.on('mousemove', onMove);
+            map.once('mouseup', onUp);
+        });
+
+        map.on('touchstart', 'user_marker_' + feature.properties.id, function (e) {
+            if (e.points.length !== 1) return;
+
+            // Prevent the default map drag behavior.
+            e.preventDefault();
+
+            map.on('touchmove', onMove);
+            map.once('touchend', onUp);
+        });
 }
 
- function addLocation(geocoder_result, pt_overRide) {
+function addLocation(geocoder_result, pt_overRide) {
     /* Only two locations can be added by the user. The geojson is created in the view by looking
     in the database for non-null values in user_lat, fav1_lat, fav2_lat. If any of these are null, they are not
     added to the geojson. Therefore, the existence of both fav1 and fav2 means two favorites have already been saved.
      */
+
+    // This is a new point, not an update to an existing point.
+    if (pt_overRide == 'new_geolocation'){pt_overRide = false}
+
     const elem = document.getElementById('location_modal');
     const instance = M.Modal.init(elem, {dismissible: false});
     console.log("ADDING LOCATION")
@@ -640,29 +866,70 @@ export function new_geocoder_marker(map, ev) {
         url: 'change_location',
         data: new_form_data,
         success: function (json) {
+            M.toast({html: "Location Added", classes: 'green rounded', displayLength:2000});
             document.getElementById("progress_container").style.display = 'none';
             document.getElementById("add_point").style.visibility="hidden"
-            let locTableDiv = $('#savedLocations')
-            locTableDiv.append(" <td class=\"center-align\" style=\"width: 100px\">\n" +
-    "  <i style=\"margin-left: 5px; color:#ff6f00; cursor:pointer;\" class=\"material-icons\"\n" +
-    "  @click=\"deativate(article.id)\">clear</i>\n" +
-    "  <i class=\"material-icons\" style=\"margin-left: 2px; color:#ffc107; cursor:pointer;\"\n" +
-    "  @click=\"getById(article), fillSelectCategories()\">edit</i>\n" +
-    "  </td>\n" +
-    "  <td><input type=\"text\" id=\""+pt+"_desc\" value=\""+new_form_data[pt+"_desc"]+"\"></td>\n" +
-    "  <td><input type=\"text\" id=\""+pt+"_lat\" value=\""+new_form_data[pt+"_lat"]+"\"></td>\n" +
-    "  <td><input type=\"text\" id=\""+pt+"_lng\" value=\""+new_form_data[pt+"_lng"]+"\"></td>\n" +
-    "  <td><input type=\"text\" id=\""+pt+"_radius\" value=\""+new_form_data[pt+"_radius"]+"\"></td>\n" +
-    "  <td><input type=\"text\" id=\""+pt+"_alert\" value=\""+null+"\"></td>")
-            console.log("success", new_form_data)
-            //addMarkers(map)
+            $('#'+pt+'-edit-icons').show()
+            $('input[id='+pt+'_desc]')
+                .val(new_form_data[pt+"_desc"])
+                .attr("type","text");
+            $('input[id='+pt+'_lat]')
+                .val(new_form_data[pt+"_lat"])
+                .attr("type","text");
+            $('input[id='+pt+'_lng]')
+                .val(new_form_data[pt+"_lng"])
+                .attr("type","text");
+            $('input[id='+pt+'_radius]')
+                .val(new_form_data[pt+"_radius"])
+                .attr("type","text");
+            $('input[id='+pt+'_alert]')
+                .val("")
+                .attr("type","text");
         },
         error: function (xhr, errmsg, err) {
+            M.toast({html: "Failed To Add Location", classes: 'red rounded', displayLength:2000});
             console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
             document.getElementById("progress_container").style.display = 'none';
             document.getElementById("add_point").style.visibility="hidden"
         }
     })
 
+}
+
+function delete_point(pt){
+    console.log("Deleting Point")
+    const el = document.getElementById('location_modal');
+    var modal = M.Modal.getInstance(el)
+    // ADD A SUBMIT BUTTON ON MODAL AND GRAY OUT FIELD
+    //The only way to get dynamic variables into an ajax call is to build the object this way:
+    let new_form_data = user_profile[0].fields
+    if (pt){
+        new_form_data[pt+"_lat"] = ""
+        new_form_data[pt+"_lng"] = ""
+        new_form_data[pt+'_radius'] = 50
+        new_form_data[pt + "_desc"] = ""
+        new_form_data[pt + "_desc"] = ""
+    }
+
+    new_form_data['csrfmiddlewaretoken'] = $('input[name=csrfmiddlewaretoken]').val()
+    new_form_data['action'] = 'post'
+    $.ajax({
+        type: 'POST',
+        url: 'change_location',
+        data: new_form_data,
+        success: function (json) {
+            modal.close()
+            document.getElementById("progress_container").style.display = 'none';
+            document.getElementById("add_point").style.visibility="hidden"
+            M.toast({html: "Point Deleted", classes: 'red rounded', displayLength:2000});
+            //addMarkers(map)
+        },
+        error: function (xhr, errmsg, err) {
+            M.toast({html: "Failed To Delete", classes: 'red rounded', displayLength:2000});
+            console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+            document.getElementById("progress_container").style.display = 'none';
+            document.getElementById("add_point").style.visibility="hidden"
+        }
+    })
 }
 

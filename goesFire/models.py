@@ -85,7 +85,8 @@ class WithDistanceManager(models.Manager):
         radflat_fav2 = Radians(F('fav2_lat'))
         radflong_fav2 = Radians(F('fav2_lng'))
 
-        if units == 'km' or "kilometers":
+        units = 'miles'
+        if units == 'km' or units == "kilometers":
             earthRad = 6371.0
         else:
             earthRad = 3959.0
@@ -117,6 +118,7 @@ class Profile(models.Model):
     alert_ok_time_end = models.DateTimeField(null=True, blank=True)
     user_lat = models.FloatField(null=True, blank=True)
     user_lng = models.FloatField(null=True, blank=True)
+    user_desc = models.FloatField(null=True, blank=True)
     fav1_lat = models.FloatField(null=True, blank=True)
     fav1_lng = models.FloatField(null=True, blank=True)
     fav2_lat = models.FloatField(null=True, blank=True)
@@ -206,7 +208,7 @@ class GoesFireTable(models.Model, WithDistanceManager):
     objects = WithDistanceManager()
 
     class Meta:
-        unique_together = ('lat', 'lng', 'scan_dt')
+        unique_together = ('lat', 'lng')
 
 # A table to hold all of the file names already downloaded.
 class FdfcFiles(models.Model):
@@ -220,7 +222,13 @@ class FdfcFiles(models.Model):
 
 class Alert(models.Model):
     user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
-    fire_id = models.ForeignKey(GoesFireTable, null=True, on_delete=models.SET_NULL)
+    goes_fire = models.ForeignKey(GoesFireTable, null=True, on_delete=models.SET_NULL)
+    fire_id = models.IntegerField(null=True)
+    # Even though we have a fire_id, with the lat/lng info, it's easier to just store the pixel that triggered
+    # the warning. This is because a single fire_id can have multiple pixels, each with a dif lat/lng. You could
+    # reference the idx of the fire itself, but I like this approach better.
+    fire_lat = models.FloatField(null=True)
+    fire_lng = models.FloatField(null=True)
     dist_to_fire = models.FloatField(null=True)
     alert_time = models.DateTimeField(null=True)
     need_to_alert = models.BooleanField(null=True)
@@ -239,8 +247,8 @@ class Alert(models.Model):
                 :param longitude (float):   The longitude of the fire (e.g. -120.22)
                 :param fav (string):        The label for the saved location (e.g. "user_", "fav1_", "fav2_"
                 """
-        units = 'miles'
-        if units == 'km' or "kilometers":
+        units = "miles"
+        if units == "km" or units == "kilometers":
             earthRad = 6371.0
         else:
             earthRad = 3959.0
@@ -253,8 +261,8 @@ class Alert(models.Model):
         #         thus it was not detected by GOES-R. Most importantly if this was not detected by GOES-R,
         #         it's not in our goesfiretable and will not have any latlng info. So, in case 2, fire_id = None
         if self.fire_id is not None:
-            radlat = math.radians(self.fire_id.lat)  # given latitude
-            radlong = math.radians(self.fire_id.lng)  # given longitude
+            radlat = math.radians(self.fire_lat)  # given latitude
+            radlong = math.radians(self.fire_lng)  # given longitude
         elif self.cal_fire_incident_id is not None:
             radlat = math.radians(self.calFire.incident_latitude)  # given latitude
             radlong = math.radians(self.calFire.incident_longitude)  # given longitude
@@ -271,6 +279,7 @@ class Alert(models.Model):
             user_dist = earthRad * math.acos(math.cos(radlat) * math.cos(radflat_user) *
                                              math.cos(radflong_user - radlong) +
                                              math.sin(radlat) * math.sin(radflat_user))
+
             if user_dist < self.user.profile.user_radius:
                 alert = True
                 loc = "Current Position"
@@ -317,7 +326,7 @@ class Alert(models.Model):
 
         # The else case is basically going to give it a value of None.
         else:
-            self.cal_fire_incident_id = self.fire_id.cal_fire_incident_id
+            self.cal_fire_incident_id = None
         self.alert_time = datetime.now()
         try:
             distance_info = self.distance_to_fire()
@@ -328,7 +337,5 @@ class Alert(models.Model):
             print("WARNING! Can Not Calculate Distance To Fire. Is Lat/Lng Info Avail?")
         finally:
             distance_info = None
-        if self.fire_id is not None:
-            self.fire_id_id = self.fire_id.fire_id
         super(Alert, self).save(*args, **kwargs)
 

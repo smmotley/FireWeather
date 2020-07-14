@@ -137,7 +137,7 @@ def change_location(request):
             location_form.save()
             #user_form.save()
             messages.success(request, f"Your Account Has Been Updated")
-            return redirect('goesFire:dashboard')
+            return redirect('mysite:change_location')
         else:
             for msg in location_form.error_messages:
                 messages.error(request, f"{msg}:{location_form.error_messages}")
@@ -167,7 +167,7 @@ def create_markers(data):
         user_feature = Feature(geometry=Point((data.user_lng, data.user_lat)),
                           properties=({"description": 'Current Location',
                                        "radius": data.user_radius,
-                                       "id": 'fav0',
+                                       "id": 'user',
                                        "alert": None,
                                        "type": "text"
                                        }))
@@ -176,7 +176,7 @@ def create_markers(data):
         user_feature = Feature(geometry=Point(),
                                properties=({"description": 'Current Location',
                                             "radius": data.user_radius,
-                                            "id": 'fav0',
+                                            "id": 'user',
                                             "alert": None,
                                             "type": "text"
                                             }))

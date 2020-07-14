@@ -26,6 +26,7 @@
         <div id="map" class="map map-big"></div>
             <script type="text/javascript">
                 fire_data = {{ fire_data|safe }}
+                    goes_fire_pixels = {{ goes_fire_pixels|safe }}
                 goes_image = {{ goes_image|safe }}
             </script>
             {{ mapbox_access_token|json_script:"create-map"}}

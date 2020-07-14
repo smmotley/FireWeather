@@ -5,9 +5,8 @@ class Fire_Image:
         self.fileName = fileName
         self.data = C
         self.FireTemp = {}                          # Dict containing RGB colorTuple that is false color
-        self.TrueColor = self.GOES_truecolor()      # Dict containing RGB colorTuple created using a True Color recipe
-        self.Composite = self.GOES_composite()      # Dict containing RGB colorTuple that combines the FireTemp and TrueColor
-
+        self.TrueColor = self.GOES_truecolor()  # Dict containing RGB colorTuple created using a True Color recipe
+        self.Composite = self.GOES_composite()  # Dict containing RGB colorTuple that combines the FireTemp and TrueColor
 
     def GOES_truecolor(self, only_RGB=False, night_IR=True):
         """
@@ -33,9 +32,13 @@ class Fire_Image:
         TC_B = C.variables['CMI_C01'][:].data
 
         # Turn empty values into nans
-        TC_R[TC_R == -1] = np.nan
-        TC_G[TC_G == -1] = np.nan
-        TC_B[TC_B == -1] = np.nan
+        try:
+            TC_R[TC_R == -1] = np.nan
+            TC_G[TC_G == -1] = np.nan
+            TC_B[TC_B == -1] = np.nan
+        except:
+            print(Warning("CREATING AN IMAGE RAN INTO ISSUES WITH EMPTY VALUES"))
+            pass
 
         # Apply range limits for each channel becuase RGB values must be between 0 and 1
         TC_R = np.maximum(TC_R, 0)
@@ -64,7 +67,10 @@ class Fire_Image:
             # Prepare the Clean IR band by converting brightness temperatures to greyscale values
             # From: https://github.com/occ-data/goes16-play/blob/master/plot.py
             cleanIR = C.variables['CMI_C13'][:].data
-            cleanIR[cleanIR == -1] = np.nan
+            try:
+                cleanIR[cleanIR == -1] = np.nan
+            except:
+                print("THE NIGHT IR RAN INTO AN ISSUE WITH NAN VALUES")
 
             # Apply range limits for clean IR channel
             cleanIR = np.maximum(cleanIR, 90)
@@ -103,9 +109,11 @@ class Fire_Image:
         TC_colorTuple = np.insert(TC_colorTuple, 3, 1.0,
                                   axis=1)  # adding an alpha channel will plot faster?? according to stackoverflow.
 
+
         return {'TrueColor': TC_RGB,
                 'file': self.fileName,
                 'rgb_tuple': TC_colorTuple}
+
 
     def GOES_composite(self):
         """
@@ -129,14 +137,17 @@ class Fire_Image:
         B = C.variables['CMI_C05'][:].data  # Band 5 is blue (0.1.6 um, snow/ice)
 
         # Turn empty values in nans (empty space in top left of figure)
-        R[R == -1] = np.nan
-        R[R == 65535] = np.nan
+        try:
+            R[R == -1] = np.nan
+            R[R == 65535] = np.nan
 
-        B[B == -1] = np.nan
-        B[B == 65535] = np.nan
+            B[B == -1] = np.nan
+            B[B == 65535] = np.nan
 
-        G[G == -1] = np.nan
-        G[G == 65535] = np.nan
+            G[G == -1] = np.nan
+            G[G == 65535] = np.nan
+        except:
+            print("AGAIN, WE HAVE A nan ISSUE")
 
         R_fire = R  # Could be used as a first test for active fires in Red channel
 
@@ -202,12 +213,14 @@ class Fire_Image:
 
         self.FireTemp = {'rgb': rgb,
                          'file': self.fileName,
-                         'rgb_tuple': colorTuple}
+                         'rgb_tuple': colorTuple,
+                         'R': R,
+                         'R_band': composite_R,
+                         'B_band': composite_B,
+                         'G_band': composite_G
+                         }
 
-        return {'rgb': composite_rgb,
-                'file': self.fileName,
-                'rgb_tuple': composite_colorTuple,
-                'R': R}
+        return self.FireTemp
 
 
 def contrast_correction(color, contrast):
@@ -222,3 +235,4 @@ def contrast_correction(color, contrast):
     COLOR = np.minimum(COLOR, 1)
     COLOR = np.maximum(COLOR, 0)
     return COLOR
+

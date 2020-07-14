@@ -12,7 +12,9 @@ var geolocate  = new mapboxgl.GeolocateControl({
 
 function createGeoLocationMap(onLoad, mapboxgl = window.mapboxgl) {
     mapboxgl.accessToken = JSON.parse(document.getElementById('mb_tkn').textContent);
-    document.getElementById ("geolocate_user").addEventListener ("click", geolocate_user, false)
+    document.getElementById ("geolocate_user").addEventListener ("click",
+        () => {geolocate_user()},
+        false)
     //document.getElementById ("add_point").addEventListener ("click", addLocation, false);
 
     let map = new mapboxgl.Map({
@@ -40,10 +42,11 @@ function createGeoLocationMap(onLoad, mapboxgl = window.mapboxgl) {
 
     mb_geocoder.on('result', function(ev) {
           geocoder_result = ev.result;
+          console.log(geocoder_result)
           var styleSpecBox = document.getElementById('json-response');
           var styleSpecText = JSON.stringify(geocoder_result, null, 2);
           document.getElementById("add_point").style.visibility="visible"
-          addMarkers.new_geocoder_marker(map, ev)
+          addMarkers.userMarkers(map, ev.result)
         });
 
     map.on('load', () =>
@@ -60,20 +63,29 @@ function geolocate_user(){
     var el = document.getElementById("change_location_tabs")
     var map_tabs = M.Tabs.getInstance(el);
     map_tabs.select('map_tab')
+    console.log("GEOLOCATING")
     geolocate.trigger();
 }
 
 geolocate.on('geolocate', function(e) {
-    var lng = e.coords.longitude;
-    var lat = e.coords.latitude;
-    var radius = document.getElementById('fav0_radius').value;
     let new_form_data = user_profile[0].fields
-    new_form_data["user_lat"] = lat
-    new_form_data["user_lng"] = lng
-    new_form_data["user_radius"] = 50
-    new_form_data["user_desc"] = 'Current Location'
-    new_form_data['csrfmiddlewaretoken']=$('input[name=csrfmiddlewaretoken]').val(),
-    new_form_data['action'] = 'post'
+    console.log(user_profile)
+    if (e.coords){
+        var lng = e.coords.longitude;
+        var lat = e.coords.latitude;
+        new_form_data["user_lat"] = lat
+        new_form_data["user_lng"] = lng
+        new_form_data["user_desc"] = "Current Location"
+        new_form_data['csrfmiddlewaretoken']=$('input[name=csrfmiddlewaretoken]').val(),
+        new_form_data['action'] = 'post'
+        try{
+            new_form_data["user_radius"] = document.getElementById('user_radius').value;
+        }
+        catch(e){
+            console.log(e, "No radius issued with geocoder result, using default val instead")
+        }
+    }
+
 
     $.ajax({
         type:'POST',
@@ -81,8 +93,8 @@ geolocate.on('geolocate', function(e) {
         data: new_form_data,
         success:function(json) {
             document.getElementById("progress_container").style.display = 'none';
-            document.getElementById('fav0_lat').value = lat
-            document.getElementById('fav0_lng').value = lng
+            document.getElementById('user_lat').value = lat
+            document.getElementById('user_lng').value = lng
             console.log("USER LAT LNG SAVED")
         },
         error : function(xhr,errmsg,err) {
@@ -90,4 +102,26 @@ geolocate.on('geolocate', function(e) {
         }
     });
 });
+
+var locs = ['user','fav1','fav2']
+for (var i = 0; i < locs.length; i++){
+    var loc = locs[i]
+    document.getElementById(loc+"-edit-location-icon")
+                .addEventListener("click", function (ev) {
+                    var loc = ev.target.id.split("-")[0]
+                    $('input[id='+loc+'_desc]')
+                        .attr("type","form");
+                    $('input[id='+loc+'_lat]')
+                        .attr("type","form");
+                    $('input[id='+loc+'_lng]')
+                        .attr("type","form");
+                    $('input[id='+loc+'_radius]')
+                        .attr("type","form");
+                    $('input[id='+loc+'_alert]')
+                        .attr("type","form");
+                    $('#location_form_buttons').show()
+            })
+}
+
+
 

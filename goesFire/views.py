@@ -18,9 +18,11 @@ MB_TOKEN = 'pk.eyJ1Ijoic21vdGxleSIsImEiOiJuZUVuMnBBIn0.xce7KmFLzFd9PZay3DjvAA'
 @login_required(login_url='/login')
 def fireDashboard(request):
     fire_data = FdfcFiles.objects.all()
-    cal_fire_data = CAfire.objects.all()
+    cal_fire_data = CAfire.objects.filter(is_active='Y')
+    goes_fire_data = GoesFireTable.objects.all()
     goes_images = GoesImages.objects.all()
     features = []
+    goes_features =[]
     #for fire in fire_data:
     for fire in cal_fire_data:
         feature = Feature(geometry=Point((fire.incident_longitude, fire.incident_latitude)),
@@ -31,6 +33,17 @@ def fireDashboard(request):
     feature_collection = FeatureCollection(features)
 
     fire_data_json = json.dumps(feature_collection)
+
+    for pixel in goes_fire_data:
+        goes_feature = Feature(geometry=Point((pixel.lng, pixel.lat)),
+                               properties=({"fire_id": pixel.fire_id,
+                                            "type": "goes_pixel"
+                                           }))
+        goes_features.append(goes_feature)
+    goes_feature_collection = FeatureCollection(goes_features)
+
+    goes_fire_pixels = json.dumps(goes_feature_collection)
+
     for image in goes_images:
         fire_image = b64encode(image.fire_temp_image).decode("utf-8")
 
@@ -42,6 +55,7 @@ def fireDashboard(request):
                   template_name='goesFire/dashboard.html',
                   context={'mapbox_access_token': MB_TOKEN,
                            "fire_data": fire_data_json,
-                           "goes_image": fire_image})
+                           "goes_image": fire_image,
+                           "goes_fire_pixels": goes_fire_pixels})
 
 

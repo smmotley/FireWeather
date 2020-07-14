@@ -3,6 +3,7 @@ import pytz
 import boto3
 import tempfile
 import netCDF4 as nc
+import os
 
 class AwsGOES(object):
     def __init__(self, bands, st_dt, hrs, bucket):
@@ -77,6 +78,7 @@ class AwsGOES(object):
     def download_file(self, FILE, bucket, s3):
         try:
             tempf = tempfile.NamedTemporaryFile().name  # Creates temporary file that is automatically deleted on close
+            #tempf = os.path.join("/Users/motley/Documents/PycharmProjects/PlayGround/FireWeather", "GOES17_NOW.nc")
             fname = FILE.split("_")[-1]
             print("Downloading :", FILE)
             s3.Bucket(bucket).download_file(FILE, tempf)
