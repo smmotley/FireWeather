@@ -4,6 +4,7 @@ import boto3
 import tempfile
 import netCDF4 as nc
 import os
+import xarray as xr
 
 class AwsGOES(object):
     def __init__(self, bands, st_dt, hrs, bucket):
@@ -83,7 +84,8 @@ class AwsGOES(object):
             print("Downloading :", FILE)
             s3.Bucket(bucket).download_file(FILE, tempf)
             print("Download Successful", tempf)
-            C = nc.Dataset(tempf, 'r')
+            #C = nc.Dataset(tempf, 'r')
+            C = xr.open_dataset(tempf)                      # Now using xarray.
             return C
         except:
             print("Can't open file:", tempf)

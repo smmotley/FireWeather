@@ -36,21 +36,21 @@ class TileRBG:
         # scan_mid = int(np.ma.round(C.variables['t'][0], decimals=0))
         # DATE = datetime(2000, 1, 1, 12) + timedelta(seconds=scan_mid)
         # Satellite height
-        sat_h = C.variables['goes_imager_projection'].perspective_point_height
+        sat_h = C['goes_imager_projection'].perspective_point_height
 
         # Satellite longitude
-        sat_lon = C.variables['goes_imager_projection'].longitude_of_projection_origin
+        sat_lon = C['goes_imager_projection'].longitude_of_projection_origin
 
         # Satellite sweep
-        sat_sweep = C.variables['goes_imager_projection'].sweep_angle_axis
+        sat_sweep = C['goes_imager_projection'].sweep_angle_axis
 
-        major_ax = C.variables['goes_imager_projection'].semi_major_axis
-        minor_ax = C.variables['goes_imager_projection'].semi_minor_axis
+        major_ax = C['goes_imager_projection'].semi_major_axis
+        minor_ax = C['goes_imager_projection'].semi_minor_axis
 
         # The projection x and y coordinates equals the scanning angle (in radians) multiplied by
         # the satellite height (https://proj.org/operations/projections/geos.html)
-        x = C.variables['x'][:] * sat_h
-        y = C.variables['y'][:] * sat_h
+        x = C['x'].values * sat_h
+        y = C['y'].values * sat_h
 
         # map object with pyproj
         p = Proj(proj='geos', h=sat_h, lon_0=sat_lon, sweep=sat_sweep)

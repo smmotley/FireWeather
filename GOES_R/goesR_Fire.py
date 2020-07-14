@@ -11,9 +11,6 @@ import os, io, time, sys
 import pandas as pd
 import boto3
 import numpy as np
-from mpl_toolkits.basemap import Basemap
-import matplotlib.pyplot as plt
-from matplotlib.patches import Circle
 import imageio
 from PIL import Image
 import shapely, shapely.ops
@@ -28,7 +25,7 @@ from noaa_aws import AwsGOES
 from timeloop import Timeloop
 import mailer
 import warnings
-import netCDF4 as nc
+import xarray as xr
 
 warnings.filterwarnings("ignore")
 
@@ -37,7 +34,6 @@ logging.basicConfig(filename='logfile.log', level=logging.ERROR)
 t1 = Timeloop()
 GOES_NUMBER = '17'
 debugging = False
-create_images = False
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db.sqlite3')
 CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
 CURSOR = CONN.cursor()
@@ -86,9 +82,6 @@ def main():
     """
     CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
     CURSOR = CONN.cursor()
-    # first_scan = "07/22/2019 23:00"     # Use for debugging.
-    forced_mp4 = False  # Set to True if you want to force program to create an mp4 at a given lngLat
-    forced_mp4_lnglat = (-122.24194399, 38.715556)
 
     # Analise only the most recent file in the S3 bucket.
     most_recent_scan = False
@@ -119,12 +112,6 @@ def main():
 
     goes_multiband_files = goes_multiband.bucket_files
 
-    if forced_mp4:
-        # The time of the last scan
-        starting_time = datetime.utcnow().strftime("%m/%d/%Y %H:%M")
-        forced_loop_creator(goes_multiband, forced_mp4_lnglat, bucket, s3, starting_time, hours_of_data=2)
-        sys.exit()  # Stop program
-
     # Given the situation where the GOES-17 data are delayed and remain delayed for several hours (or days)
     # this will -- at the very least -- allow for alerts to continue if the data are no more than 3 hours old.
     # This will check if the list is empty, which indicates no GOES-17 files have been generated in the last hour.
@@ -138,8 +125,7 @@ def main():
             hrs=hours_of_data)
         try:
             lastf_time = datetime.strptime(((goes_multiband.bucket_files[-1])
-                .split("_c")[1])
-                                           .replace('.nc', ""), "%Y%j%H%M%S%f")
+                .split("_c")[1]).replace('.nc', ""), "%Y%j%H%M%S%f")
             print(f"GOES DATA IS DELAYED, LATEST FILE IS: {abs(lastf_time - datetime.utcnow()).seconds / (60 * 60)} "
                   f" hours old.")
         except Exception as e:
@@ -162,15 +148,12 @@ def main():
         # Additional Info: https://www.goes-r.gov/products/baseline-fire-hot-spot.html
         if debugging:
             import netCDF4 as nc
-            Cf = nc.Dataset('../ABI_fire.nc', 'r')
+            Cf = xr.open_dataset('../ABI_fire.nc', 'r')
         Cf = goes_hotspot.download_file(ALL_FILES[FILE], goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
-        # Cf = goes_hotspot.download_file('ABI-L2-FDCF/2019/218/17/OR_ABI-L2-FDCF-M6_G17_s20192181720341_e20192181729408_c20192181729505.nc', goes_hotspot.bucket, s3)  # HOT SPOT DOWNLOAD
 
         # Timestamp on Fire Characterization / Hotspot detection file.
-        fdfc_seconds = int(np.ma.round(Cf.variables['t'][0], decimals=0))
-
-        # Times reported in seconds since 2000-01-01 12:00:00
-        fdfc_DATE = datetime(2000, 1, 1, 12, tzinfo=pytz.UTC) + timedelta(seconds=fdfc_seconds)
+        midpoint = str(Cf['t'].data)[:-10]
+        fdfc_DATE = datetime.strptime(midpoint, '%Y-%m-%dT%H:%M:%S')
 
         # The lat / lng of GOES-R detected hotspots
         fire_latlng, xres, yres = fire_pixels(Cf)
@@ -203,85 +186,6 @@ def main():
             print("New Fire Detected, Setting up alert...")
             alert_user()
 
-        if create_images:
-            C = goes_multiband.download_file(FILE,
-                                             goes_multiband.bucket,
-                                             s3)  # NETCDF File containing multiband GOES data
-
-            # Seconds since 2000-01-01 12:00:00
-            add_seconds = int(np.ma.round(C.variables['t'][0], decimals=0))
-            DATE = datetime(2000, 1, 1, 12, tzinfo=pytz.UTC) + timedelta(seconds=add_seconds)
-
-            # Timestamp difference between the GOES multiban scan and the GOES Fire detection scan. This should be < 6 min.
-            scan_diff = abs(fdfc_DATE - DATE).seconds / 60
-
-            print(f"DATE OF FDFC FILE: {fdfc_DATE}\n"
-                  f"DATE OF MULTIBAND FILE: {DATE}\n"
-                  f"MINUTES BETWEEN FILES:{scan_diff}")
-
-            if scan_diff > 1:
-                logging.info("Duration between GOES mutiband and GOES Hotspot detection scan is " +
-                             str(scan_diff) + " minutes.")
-
-            # goes_firetemp_img(C, [38.59,-121.41], FILE, None, False)
-            tiles = Fire_Image(C=C, fileName=FILE).CreateTiles
-
-            # The idea here, was to get the fire ID that the user is alerted on, and make an mp4 for that user
-            # to see in the text. To make the mp4, the code would get all images from the past hour (downloading
-            # additional images if some where missed) and combine the images into an mp4). This is kind of a dumb
-            # idea for multiple users, since every single user would need a custom image set for them. Therefore,
-            # a better alternative is to either 1) provide a url for more info or 2) include an image that's already
-            # avaliable on the webpage.
-
-            # Info needed for a new fire includes the fire's location and incident id number (either our id or CA_fire)
-            # THE FOLLOWING WILL NEVER RUN...TODO: DELETE
-            if False:
-                sql = '''SELECT fire_lng, fire_lat, alerted_incident_id, alerted_cal_fire_incident_id 
-                             FROM goesFire_profile WHERE user_id = 1 AND need_to_alert = 1'''
-                CURSOR.execute(sql)
-                resp = list(CURSOR.fetchall())
-                map_lnglat = [item[0:2] for item in resp]
-                fire_id = [item[2] for item in resp if item][-1]
-                if not fire_id:
-                    fire_id = [item[3] for item in resp if item][-1]
-
-                # A list of files already downloaded into the database and processed into .png images.
-                CURSOR.execute("SELECT s3_filename FROM goesFire_goesimages WHERE fire_id = ?", [fire_id])
-                already_downloaded = [item[0] for item in list(CURSOR.fetchall())]
-
-                # To create an mp4 loop that is "hours_of_data" in length, we first need to get all the file names
-                # of the multiband files.
-                mp4_files = AwsGOES(
-                    bands=[7, 8],
-                    bucket=bucket,
-                    st_dt=fdfc_DATE.strftime("%m/%d/%Y %H:%M"),
-                    hrs=hours_of_data).bucket_files
-
-                # If the file isn't in our database yet, go download it.
-                for mp4_file in (mp4_file for mp4_file in mp4_files if mp4_file not in already_downloaded):
-                    # for mp4_file in mp4_files:
-                    # Download multiband netcdf file
-                    C = goes_multiband.download_file(mp4_file, goes_multiband.bucket,
-                                                     s3)  # NETCDF File containing multiband GOES data
-
-                    # Seconds since 2000-01-01 12:00:00
-                    add_seconds = int(np.ma.round(C.variables['t'][0], decimals=0))
-                    DATE = datetime(2000, 1, 1, 12) + timedelta(seconds=add_seconds)
-
-                    # Timestamp difference between the GOES multiban scan and the GOES Fire detection scan. This should be < 6 min.
-                    scan_diff = abs(fdfc_DATE - DATE).seconds / 60
-
-                    print(f"DATE OF FDFC FILE: {fdfc_DATE}\n"
-                          f"DATE OF MULTIBAND FILE: {DATE}\n"
-                          f"MINUTES BETWEEN FILES:{scan_diff}")
-
-                    if scan_diff > 1:
-                        logging.info("Duration between GOES mutiband and GOES Hotspot detection scan is " +
-                                     str(scan_diff) + " minutes.")
-
-                    # Create a true color image and store the png file in the database.
-                    goes_firetemp_img(C, map_lnglat, mp4_file, fire_id, False)
-                # alert_user(new_fires, 1, fdfc_DATE, fire_id)
         else:
             print("No New Fires Found For: " + fdfc_DATE.strftime("%m/%d/%Y %H:%M"))
     print("COMPLETE!")
@@ -345,11 +249,11 @@ def fire_pixels(C):
                 to test whether a fire_point is associated with the same fire as another point
     """
 
-    scan_mid = int(np.ma.round(C.variables['t'][0], decimals=0))
-    DATE = datetime(2000, 1, 1, 12) + timedelta(seconds=scan_mid)
+    midpoint = str(C['t'].data)[:-10]
+    DATE = datetime.strptime(midpoint, '%Y-%m-%dT%H:%M:%S')
 
     # Load the RGB arrays for muti-band data
-    FM = C.variables['Mask'][:].data  # Fire Mask
+    FM = C['Mask'].data  # Fire Mask
     FM = FM.astype(np.float64)
 
     """ 
@@ -451,8 +355,8 @@ def fire_pixels(C):
 
     # The projection x and y coordinates equals the scanning angle (in radians) multiplied by the satellite height
     # See details here: https://proj4.org/operations/projections/geos.html?highlight=geostationary
-    X = C['x'][:] * sat_h
-    Y = C['y'][:] * sat_h
+    X = C['x'].values * sat_h
+    Y = C['y'].values * sat_h
 
     # XC and YC are the mid points of each grid box. Translating the function below:
     #       (X[1:] - X[-1]) is the difference between two adjoining grid boxes. Dividing by 2 gives us 1/2 of the
@@ -489,7 +393,6 @@ def fire_pixels(C):
     # Grab points with a mask = 10 or 11
     fire_pts = zip(lons[(FM == 10) | (FM == 11) | (FM == 30) | (FM == 31)],
                    lats[(FM == 10) | (FM == 11) | (FM == 30) | (FM == 31)])
-    # fire_pts = zip(lons[(FM >= 10) & (FM <= 13)], lats[(FM >= 10) & (FM <= 13)])
 
     # Read in shapefile obtained from here: https://data.ca.gov/dataset/ca-geographic-boundaries
     ca_shapefile = osgeo.gdal.OpenEx(
@@ -517,146 +420,7 @@ def fire_pixels(C):
         if Point(pt).within(ca_polyLL):
             ca_fire_pts.append(pt)
 
-    # # FOR PLOTTING PURPOSES
-    # FM[FM == -99] = np.nan
-    # FM[FM == 40] = np.nan
-    # FM[FM == 50] = np.nan
-    # FM[FM == 60] = np.nan
-    # FM[FM == 150] = np.nan
-    # #FM[FM != 13] = np.nan
-    # FM[FM == max(FM[0])] = np.nan
-    # FM[FM == min(FM[0])] = np.nan
-    #
-    # l = {'latitude': 37.75,
-    #      'longitude': -120.5}
-    #
-    # m = Basemap(resolution='i', projection='cyl', area_thresh=50000, llcrnrlon=l['longitude'] - 5,
-    #             llcrnrlat=l['latitude'] - 5,
-    #             urcrnrlon=l['longitude'] + 5, urcrnrlat=l['latitude'] + 5, )
-    #
-    # m.drawcoastlines()
-    # m.drawcountries()
-    # m.drawstates()
-    # m.drawcounties()
-    # file_loc = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'CA_Shapefile', 'CA_State_TIGER2016')
-    # #m.readshapefile(shapefile=file_loc, name='CA_State_TIGER2016', linewidth=1)
-    #
-    # plt.figure(1, figsize=[15, 12])
-    #
-    # # In order to plot, you must do pcolormesh, not imshow. If you do imshow, the image will be stretched (no idea why).
-    # m.pcolormesh(lons,lats,FM, latlon=True)
-    # fire_latlng = lons[(FM >= 10) & (FM <= 14)], lats[(FM >= 10) & (FM <= 14)]
-    # # Use the following code to place a blue dot in the center of a FIRE PIXEL.
-    # x, y = m([i for i in fire_latlng[0].compressed()], [j for j in fire_latlng[1].compressed()])
-    # m.plot(x, y, 'bo', markersize=18)
-    #
-    # #THE FOLLOWING WILL NOT WORK, must use pcolormesh instead
-    # #m.imshow(FM, cmap="jet", vmin=0, vmax=255, origin='upper')  # Since "images" are upside down, we flip the RGB up/down
-    # plt.show()
-    # test = np.nanmin(FM)
-    # test2 = np.nanmax(FM)
-
     return ca_fire_pts, xres, yres
-
-
-def goes_firetemp_img(C, map_center_latlng, FILE, fire_id, only_RGB=False):
-    composite_img = Fire_Image(C=C, fileName=FILE).Composite
-
-    # Scan's start time, converted to datetime object
-    scan_start = datetime.strptime(C.time_coverage_start, '%Y-%m-%dT%H:%M:%S.%fZ')
-
-    scan_mid = int(np.ma.round(C.variables['t'][0], decimals=0))
-    DATE = datetime(2000, 1, 1, 12) + timedelta(seconds=scan_mid)
-
-    # Satellite height
-    sat_h = C.variables['goes_imager_projection'].perspective_point_height
-
-    # Satellite longitude
-    sat_lon = C.variables['goes_imager_projection'].longitude_of_projection_origin
-
-    # Satellite sweep
-    sat_sweep = C.variables['goes_imager_projection'].sweep_angle_axis
-
-    # The projection x and y coordinates equals the scanning angle (in radians) multiplied by
-    # the satellite height (https://proj.org/operations/projections/geos.html)
-    x = C.variables['x'][:] * sat_h
-    y = C.variables['y'][:] * sat_h
-
-    # map object with pyproj
-    p = Proj(proj='geos', h=sat_h, lon_0=sat_lon, sweep=sat_sweep)
-
-    # to latitude and longitude values.
-    XX, YY = np.meshgrid(x, y)
-    lons, lats = p(XX, YY, inverse=True)
-
-    # Location of latest firepoint
-    l = {'latitude': map_center_latlng[0],
-         'longitude': map_center_latlng[1]}
-
-    # Draw zoomed map
-    m = Basemap(resolution='i', projection='cyl', area_thresh=50000, llcrnrlon=l['longitude'] - 2,
-                llcrnrlat=l['latitude'] - 2,
-                urcrnrlon=l['longitude'] + 2, urcrnrlat=l['latitude'] + 2, )
-
-    # We need an array the shape of the data, so use R. The color of each pixel will be set by color=colorTuple.
-    # newmap = m.pcolormesh(lons, lats, R, color=colorTuple, linewidth=0, latlon=True)
-    # newmap.set_array(None)  # Without this line the RGB colorTuple is ignored and only R is plotted.
-
-    plt.figure(figsize=[15, 12])
-    # fig, ax = plt.subplots()
-
-    map_text = {"PCWA": m(-121.05329, 38.922), "Forest Hill": m(-120.8334, 39.0180),
-                "Hell Hole Res": m(-120.4100, 39.05795), "French Meadows": m(-120.4701, 39.1117)}
-
-    # ax.annotate("PCWA", xy=m(-121.05329, 38.922))
-
-    # ax.annotate([text_key for text_key in map_text.keys()],
-    #            ([x[0] for x in map_text.values()], [y[1] for y in map_text.values()]),
-    #            xytext=(5,5))
-
-    newmap = m.pcolormesh(lons, lats, composite_img['R'], color=composite_img['rgb_tuple'], linewidth=0, latlon=True)
-    newmap.set_array(None)
-
-    plt.title('GOES-17 Fire Detection', loc='left', fontweight='semibold', fontsize=15)
-    plt.title('%s' % scan_start.strftime('%d %B %Y %H:%M UTC'), loc='right');
-
-    m.drawcountries(color='white')
-    m.drawstates(color='white')
-    m.drawcounties(color='white', linewidth=0.5)
-
-    # # Use the following code to place a blue dot in the center of a FIRE PIXEL.
-    # x,y = m([i[1] for i in R_Band_fire_latlng], [i[0] for i in R_Band_fire_latlng])
-    # # PLACE BLUE DOT ON CENTER POINT OF OF VALID PIXEL
-    # m.plot(x, y, 'bo', markersize=18)
-    # for x, y in zip(x,y):
-    #     fire_circle = Circle(xy=m(x, y), radius=0.25, fill=False, color='g', linewidth=1)
-    #     plt.gca().add_patch(fire_circle)
-
-    # PLACE RED DOT ON CENTER POINT OF OF VALID PIXEL
-    # m.plot(x2, y2, 'ro', markersize=2)
-
-    # PUT CIRCLE AROUND FIRE PIXELS
-    # x2, y2 = m([i[0] for i in map_center_latlng], [i[1] for i in map_center_latlng])
-    # for x2, y2 in zip(x2,y2):
-    #     fire_circle = Circle(xy=m(x2, y2), radius=0.2, fill=False, color='r', linewidth=2)
-    #     plt.gca().add_patch(fire_circle)
-    buf = io.BytesIO()
-    plt.savefig(buf, bbox_inches='tight', format='png')
-    buf.seek(0)
-    # plt.show()
-
-    # Store image into database
-    ablob = buf.getvalue()
-    obj, created = GoesImages.objects.get_or_create(scan_dt=DATE, fire_temp_image=ablob, s3_filename=FILE)
-    if created:
-        print("New Image Saved")
-
-    buf.close()
-
-    # extract_picture('2018-11-08 15:03:37')
-    plt.close()
-    return
-
 
 def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
     """ - Purpose: Determine if a GOES detected fire is a single pixel or a part of a larger group.
@@ -679,16 +443,12 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
     :param yres:    Same as xres but in the y dir
     :return:
     """
-    fire_pts = [{"lat": ll[1], "lng": ll[0], "fire_id": nan, "scan_dt": DATE, "s3_filename": FILE} for ll in fire_ll]
-    fire_group_num = max_group_id
     try:
         # Get largest group number ID
         fire_group_num = GoesFireTable.objects.order_by("fire_id").last().fire_id
     except AttributeError as e:
         print("Can not find a group number, is the database new? Changing group number to 1")
         fire_group_num = 0
-
-    fire_group_num = fire_group_num + 1
 
     for ll in fire_ll:
         # The idea here is that we have three scenarios for a new fire pixel:
@@ -796,96 +556,6 @@ def alert_user():
         # PUT: "CURRENT WINDS, HUMIDITY, FIRE_SPREAD_RATE" AT SOURCE
         user_alerts.update(need_to_alert=False)
         print("Email Sent!")
-
-    # sql = "SELECT * FROM goesFire_profile WHERE user_id = ?"
-    # df = pd.read_sql(sql, CONN, params=[userID])
-    # email_text = f"A total of {alert_num} new incidents have been reported. \n \n"
-    # for idx, row in df.iterrows():
-    #     if row['need_to_alert']:
-    #         if row['alerted_incident_id'] is not None:
-    #             email_text += f"This is a GOES-R detected fire " \
-    #                 f"{int(row['dist_to_fire'])} miles away from your saved location. \n \n"
-    #
-    #             sql_update = "UPDATE goesFire_profile SET need_to_alert=FALSE WHERE user_id=? AND alerted_incident_id=?"
-    #             CURSOR.execute(sql_update, [userID, row['alerted_incident_id']])
-    #             CONN.commit()
-    #         if row['alerted_cal_fire_incident_id'] is not None:
-    #             sql = "SELECT * FROM goesFire_cafire WHERE incident_id = ?"
-    #             df_calfire = pd.read_sql(sql, CONN, params=[row['alerted_cal_fire_incident_id']])
-    #
-    #             email_text += f"This is a Cal Fire Reported Incident created on {df_calfire['incident_date_created'][0]}. " \
-    #                 f"\n The fire is {int(row['dist_to_fire'])} miles away from your saved location." \
-    #                 f"\n Current size of fire is: {df_calfire['incident_acres_burned'][0]} acres. Containment =  " \
-    #                 f"{df_calfire['incident_containment'][0]}% \n" \
-    #                 f"Additional Information: {df_calfire['incident_url'][0]} \n \n"
-    #
-    #
-    #             sql_update = "UPDATE goesFire_profile SET need_to_alert=0 " \
-    #                          "WHERE user_id=? AND alerted_cal_fire_incident_id=?"
-    #             CURSOR.execute(sql_update, [userID, row['alerted_cal_fire_incident_id']])
-    #             CONN.commit()
-    #
-    # # All alerts for this user should now be false, double check to make sure.
-    # sql_update = "SELECT * FROM goesFire_profile WHERE need_to_alert=1 " \
-    #              "AND user_id=?"
-    # CURSOR.execute(sql_update, [userID])
-    # if len(list(CURSOR.fetchall())) != 0:
-    #     logging.CRITICAL("USERS ALERTS ARE NOT RESETTING!!")
-    #     sql_update = "UPDATE goesFire_profile SET need_to_alert=0 " \
-    #                  "WHERE user_id=? AND need_to_alert=1"
-    #     CURSOR.execute(sql_update, [str(userID)])
-    #     CONN.commit()
-    #
-    # create_mp4(CONN, st_time, fire_id, loop_hours=1)
-    # sql = "SELECT fire_temp_gif, MAX(scan_dt) FROM goesFire_goesimages WHERE fire_temp_gif NOT NULL"
-    # CURSOR.execute(sql)
-    # ablob = CURSOR.fetchone()
-    # filename = 'fire_latest.mp4'
-    # fpath = os.path.join(os.path.dirname(os.path.realpath(__file__)),filename)
-    # with open(fpath, 'wb') as output_file:
-    #     output_file.write(ablob[0])
-    #     print("SENDING EMAIL...")
-    #     #mailer.send_mail(filename, email_text)
-    #     print("EMAIL SENT...")
-    return
-
-
-def extract_gif(scan_time):
-    # sql = "SELECT fire_temp_gif FROM goes_r_images WHERE scan_dt = ? AND fire_temp_gif NOT NULL"
-    sql = "SELECT fire_temp_image FROM goesFire_goesimages WHERE scan_dt = ? AND fire_temp_image NOT NULL"
-    # param = {'scan_dt': scan_time}
-    CURSOR.execute(sql, [scan_time])
-    ablob = CURSOR.fetchone()
-    filename = 'test.png'
-    with open(filename, 'wb') as output_file:
-        output_file.write(ablob[0])
-    return filename
-
-
-def create_mp4(conn, scan_time, fire_id, loop_hours):
-    frames = []
-    cursor = conn.cursor()
-    one_hour = scan_time - timedelta(hours=loop_hours)
-    sql = "SELECT scan_dt FROM goesFire_goesimages WHERE scan_dt <= ? AND scan_dt >= ? AND fire_id = ?"
-    cursor.execute(sql, [scan_time, one_hour, fire_id])
-    timestamps = list(cursor.fetchall())
-    fname = 'fire_cur.mp4'
-    fpath = os.path.join(os.path.dirname(os.path.realpath(__file__)), fname)
-    for imgtime in timestamps:
-        sql = "SELECT fire_temp_image FROM goesFire_goesimages WHERE scan_dt = ? AND fire_id = ?"
-        cursor.execute(sql, [imgtime[0], fire_id])
-        imgFile = cursor.fetchone()
-        img = Image.open(io.BytesIO(imgFile[0]))
-        frames.append(img)
-    try:
-        imageio.mimwrite(fpath, frames, fps=5)
-        with open(fpath, 'rb') as gif:
-            ablob = gif.read()
-            sql = '''UPDATE goesFire_goesimages SET fire_temp_gif = ? WHERE scan_dt = ?'''
-            cursor.execute(sql, [sqlite3.Binary(ablob), timestamps[-1][0]])
-            conn.commit()
-    except:
-        print("NO IMAGES TO PROCESS.")
     return
 
 
@@ -948,48 +618,6 @@ def update_alertDB(loop_duration):
     return Alert.objects.filter(need_to_alert=True).count()
 
 
-def forced_loop_creator(goes_multiband, center_lnglat, bucket, s3, starting_time, hours_of_data):
-    """
-
-    :param goes_multiband: The multiband file object
-    :param center_lnglat:  The longitude, latitude point of interest (center point of image).
-    :param bucket:         Passing s3 bucket name
-    :param s3:             For boto3
-    :param hours_of_data:  The duration of the mp4 loop in hours.
-    :param starting_time:  The time of the last scan.
-    :return:
-    """
-    fire_id = -999  # Flag these image files to be deleted from the database.
-    CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
-    CURSOR = CONN.cursor()
-    print("Forced Creation of MP4...")
-
-    # To create an mp4 loop that is "hours_of_data" in length, we first need to get all the file names
-    # of the multiband files.
-    mp4_files = AwsGOES(
-        bands=[7, 8],
-        bucket=bucket,
-        st_dt=starting_time,
-        hrs=hours_of_data).bucket_files
-
-    map_lnglat = [center_lnglat]
-
-    # If the file isn't in our database yet, go download it.
-    # for mp4_file in (mp4_file for mp4_file in mp4_files if mp4_file not in already_downloaded):
-    for mp4_file in mp4_files:
-        # Download multiband netcdf file
-        C = goes_multiband.download_file(mp4_file, goes_multiband.bucket,
-                                         s3)  # NETCDF File containing multiband GOES data
-
-        # Create a true color image and store the png file in the database.
-        goes_firetemp_img(C, map_lnglat, mp4_file, fire_id, False)
-    create_mp4(CONN, datetime.utcnow(), fire_id, hours_of_data)
-    # sql = "DELETE from main.goes_r_images WHERE fire_id = ?"
-    # CURSOR.execute(sql, [fire_id])
-    # CONN.commit()
-    return
-
-
 def append_db(data, conn):
     try:
         data.to_sql('goesFire_goesfiretable', conn, index=True, if_exists='append')
@@ -1007,15 +635,10 @@ def append_db(data, conn):
             "Could not rectify duplicate entries. \n{}".format(e2)
         return 'Success after dedupe'
 
-
-def upload_to_mapbox(C):
-    Fire_Image.Tile_creation(C=C)
-
-
 if __name__ == "__main__":
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
-    C = nc.Dataset("GOES17_NOW.nc", 'r')
-    tiles = Fire_Image(C=C, fileName="NULL").CreateTiles
+    #C = nc.Dataset("GOES17_NOW.nc", 'r')
+    #tiles = Fire_Image(C=C, fileName="NULL").CreateTiles
     # fire_group(fire_ll=[(-115.52374428135043, 33.213616673285195)],DATE='2020-06-25 23:15:05',xres=200,FILE='test',max_group_id=1)
     # update_alertDB(100)
     # alert, created = Alert.objects.get_or_create(user_id=1,

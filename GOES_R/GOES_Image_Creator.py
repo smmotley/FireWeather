@@ -27,9 +27,9 @@ class Fire_Image:
             return None
 
         # Load the RGB arrays
-        TC_R = C.variables['CMI_C02'][:].data
-        TC_G = C.variables['CMI_C03'][:].data
-        TC_B = C.variables['CMI_C01'][:].data
+        TC_R = C['CMI_C02'][:].data
+        TC_G = C['CMI_C03'][:].data
+        TC_B = C['CMI_C01'][:].data
 
         # Turn empty values into nans
         try:
@@ -132,9 +132,9 @@ class Fire_Image:
             return None
 
         # Load the RGB arrays
-        R = C.variables['CMI_C07'][:].data  # Band 7 is red (0.3.9 um, shortwave)
-        G = C.variables['CMI_C06'][:].data  # Band 6 is "green" (0.2.2 um, cloud particle)
-        B = C.variables['CMI_C05'][:].data  # Band 5 is blue (0.1.6 um, snow/ice)
+        R = C['CMI_C07'][:].data  # Band 7 is red (0.3.9 um, shortwave)
+        G = C['CMI_C06'][:].data  # Band 6 is "green" (0.2.2 um, cloud particle)
+        B = C['CMI_C05'][:].data  # Band 5 is blue (0.1.6 um, snow/ice)
 
         # Turn empty values in nans (empty space in top left of figure)
         try:
@@ -214,6 +214,7 @@ class Fire_Image:
         self.FireTemp = {'rgb': rgb,
                          'file': self.fileName,
                          'rgb_tuple': colorTuple,
+                         'rgb_composite': composite_colorTuple,
                          'R': R,
                          'R_band': composite_R,
                          'B_band': composite_B,
