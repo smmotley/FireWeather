@@ -7,7 +7,7 @@ import os
 import xarray as xr
 
 class AwsGOES(object):
-    def __init__(self, bands, st_dt, hrs, bucket):
+    def __init__(self, bands, st_dt, hrs, bucket, domain):
         """
         Class object for accessing GOES data on the AWS server.
         :param goesNum (str): GOES-R satellite number (either 16 or 17).
@@ -18,6 +18,7 @@ class AwsGOES(object):
         """
         self.bucket = bucket
         self.bands = bands
+        self.domain = domain
         self.product = self.getProduct()
         self.st_dt = datetime.strptime(st_dt, '%m/%d/%Y %H:%M').replace(tzinfo=pytz.UTC)
         self.hrs = hrs
@@ -35,9 +36,15 @@ class AwsGOES(object):
         # 'ABI-L1b-RadC'    CONUS Radiances: Use for constructing actual images
         # 'ABI-L2-CMIPC'    Single Band CONUS Cloud & Moisture Imagery
         # 'FDCF'            Fire Detection and Characterization.
+        # ABI-L2-MCMIPCM1     MESO 1
+        if self.bands[0] == 'FDCF':
+            product = 'ABI-L2-FDCF'         # Fire Detection and Characterization.
+        if len(self.bands) > 1:
+            product = 'ABI-L2-MCMIPC'       # CONUS Multi-Channel
+            if self.domain == "MESO1":
+                product = 'ABI-L2-MCMIPM'
+        return product
 
-        if self.bands[0] == 'FDCF': return 'ABI-L2-FDCF'        # Fire Detection and Characterization.
-        if len(self.bands) > 1: return 'ABI-L2-MCMIPC'          # CONUS Multi-Channel
 
     def getFileNames(self):
         s3 = boto3.resource('s3')
@@ -60,6 +67,13 @@ class AwsGOES(object):
 
             scanMode = "M6"
             # Prior to April 1, 2018 the scan modes were in mode 3
+
+            meso_sector = ""
+            if self.domain == 'MESO1':
+                meso_sector = "1"
+            if self.domain == 'MESO2':
+                meso_sector = "2"
+
             if date_of_hr < datetime(2019, 4, 1).replace(tzinfo=pytz.UTC):
                 scanMode = "M3"
             if len(self.bands) == 1 :
@@ -67,7 +81,7 @@ class AwsGOES(object):
                 # and C07 is channel 7. Also check to make sure we're not looking for
                 if type(self.bands[0]) is int:
                     scanMode = f"{scanMode}C{self.bands[0]:02}"
-            prefix = f"{product}/{date_of_hr.year}/{doy}/{date_of_hr.hour:02}/OR_{product}-{scanMode}_G{goesNum}_"  # Multi Band
+            prefix = f"{product}/{date_of_hr.year}/{doy}/{date_of_hr.hour:02}/OR_{product}{meso_sector}-{scanMode}_G{goesNum}_"  # Multi Band
             objs = bucket.objects.filter(Prefix=prefix)
             #for ob in objs:
                 #print(ob)

@@ -100,6 +100,7 @@ def main():
     goes_hotspot = AwsGOES(
         bands=['FDCF'],
         bucket=bucket,
+        domain="CONUS",
         st_dt=first_scan,
         hrs=hours_of_data)
 
@@ -107,6 +108,7 @@ def main():
     goes_multiband = AwsGOES(
         bands=[7, 8],
         bucket=bucket,
+        domain="MESO1",
         st_dt=first_scan,
         hrs=hours_of_data)
 
@@ -121,6 +123,7 @@ def main():
         goes_multiband = AwsGOES(
             bands=[7, 8],
             bucket=bucket,
+            domain="MESO1",
             st_dt=first_scan,
             hrs=hours_of_data)
         try:
@@ -508,6 +511,32 @@ def fire_group(fire_ll, DATE, xres, FILE, max_group_id):
 
     # Now all of our fires have an ID associated with them. Let's now check every point that doesn't have a
     # CAL fire ID associated with it to see if there are any CAL fires close enough to be associated with that fire.
+
+    df_calfire = pd.read_csv("https://www.fire.ca.gov/imapdata/mapdataactive.csv")
+    CAfire.objects.all().delete()
+    # iterate over DataFrame and create your objects
+    for fire in df_calfire.itertuples():
+        fire = CAfire.objects.create(incident_id=fire.incident_id,
+                                     incident_name=fire.incident_name,
+                                     incident_is_final=fire.incident_is_final,
+                                     incident_date_last_update=fire.incident_date_last_update,
+                                     incident_date_created=fire.incident_date_created,
+                                     incident_administrative_unit=fire.incident_administrative_unit,
+                                     incident_county=fire.incident_county,
+                                     incident_location=fire.incident_location,
+                                     incident_acres_burned=fire.incident_acres_burned,
+                                     incident_containment=fire.incident_containment,
+                                     incident_control=fire.incident_control,
+                                     incident_cooperating_agencies=fire.incident_cooperating_agencies,
+                                     incident_longitude=fire.incident_longitude,
+                                     incident_latitude=fire.incident_latitude,
+                                     incident_type=fire.incident_type,
+                                     incident_url=fire.incident_url,
+                                     incident_date_extinguished=fire.incident_date_extinguished,
+                                     incident_dateonly_extinguished=fire.incident_dateonly_extinguished,
+                                     incident_dateonly_created=fire.incident_dateonly_created,
+                                     is_active=fire.is_active)
+
 
     calfires = CAfire.objects.filter(incident_is_final=0)
     for calfire in calfires:

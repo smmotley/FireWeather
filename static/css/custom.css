@@ -2466,16 +2466,16 @@ table span.badge {
 .container {
  margin:0 auto;
  max-width:1280px;
- width:90%
+ width:95%
 }
 @media only screen and (min-width: 601px) {
  .container {
-  width:85%
+  width:95%
  }
 }
 @media only screen and (min-width: 993px) {
  .container {
-  width:70%
+  width:95%
  }
 }
 .col .row {
@@ -7733,7 +7733,7 @@ main>.container {
   padding-left:300px
  }
  .container {
-  width:80%
+  width:95%
  }
 }
 button {
@@ -8396,6 +8396,12 @@ nav.navbar ul a:focus {
  padding: 2px !important;
  background-color: transparent !important;
 }
+
+.goes_fire_popup{
+ padding: 10px 10px 15px; !important;
+ background-color: #fff !important;
+}
+
 
 .mapboxgl-popup-close-button {
  z-index: 2;

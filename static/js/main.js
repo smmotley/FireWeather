@@ -12,9 +12,11 @@ import * as addMarkers from "./util/addMarkers.js";
 mapboxgl.accessToken = JSON.parse(document.getElementById('create-map').textContent);
 
 //const layerToggles = new navBar(content);
-const layerToggles = document.querySelectorAll("input[type=checkbox]")
-const animateButton = document.querySelectorAll("#animator")
-
+const layerToggles = document.querySelectorAll(".map-toggle")
+const animateButton = document.querySelectorAll("#animate")
+const markerToggles = document.querySelector("#PCWA_Markers")
+const CALfireToggles = document.querySelector("#CALfire_Markers")
+const GOESfireToggles = document.querySelector("#GOESfire_Markers")
 
 const VALUE_RANGE = [0, 255];
 const valueMap = [
@@ -277,6 +279,7 @@ const valueMap = [
 ];
 const vMap = createValueMap(...VALUE_RANGE);
 
+
 function createValueMap(min, max) {
     const map = [...valueMap];
 
@@ -319,22 +322,176 @@ createMap(map => {
     let top_layer_url = undefined
     layerToggles.forEach(function(elem){
             elem.addEventListener('change', () =>{
-                console.log(elem)
                 const isChecked = elem.checked
-                if (!isChecked) tileSet.removeTiles(map,elem.dataset.do);
-                else tileSet.loadTiles(map,loader,1,elem.dataset.do,colorTexture.create(vMap, colorFunctionVisSat))
+                if (!isChecked) {
+                    animateButton[0].setAttribute('data-animating', 'nothing')
+                    tileSet.removeTiles(map,elem.dataset.do)
+                }
+                else {
+                    animateButton[0].setAttribute('data-animating', elem.dataset.do)
+                    tileSet.loadTiles(map,loader,elem.dataset.do,colorTexture.create(vMap, colorFunctionVisSat), false)
+                }
             })
          });
+
     animateButton.forEach(function (elem) {
-        elem.addEventListener('change',() =>{
-            console.log("Animating")
-            tileSet.loadTiles(map,loader,6,elem.dataset.do,colorTexture.create(vMap, colorFunctionVisSat))
+        elem.addEventListener('click',() =>{
+
+            var top_raster_id = find_top_layer(map, elem)
+
+            // ANIMATION START REQUESTED
+            if (elem.value === 'paused'){
+                // Animation is being requested, so set the value to play
+                elem.value = 'play'
+
+                // Set which layer is animating. Note: getting the top layer ID would no longer work if this layer is
+                // animating and someone adds another layer after the animation starts. In that case, you couldn't
+                // stop the animation.
+                elem.setAttribute('data-animating', top_raster_id)
+
+                // Change the play button to a pause button
+                $('.pause_play_button').text('pause_circle_outline')
+
+                // Get the tiles to start animation.
+                tileSet.loadTiles(map,loader,top_raster_id,colorTexture.create(vMap, colorFunctionVisSat), true)
+            }
+
+            // ANIMATION STOP REQUESTED
+            else {
+                elem.value = 'paused'
+                var animating_layer = elem.getAttribute('data-animating')
+                $('.pause_play_button').text('play_circle_outline')
+                tileSet.animateTiles(map, animating_layer, 1, false)
+            }
         })
     })
-   const pcwaMarkers = addMarkers.pcwaMarkers(map)
-   const fireMarkers = addMarkers.fireMarkers(map)
 
+    markerToggles.addEventListener('change', (elem) => {
+            const isChecked = elem.srcElement.checked
+            if (isChecked) {
+                addMarkers.pcwaMarkers.addmarkers(map)
+            } else {
+                addMarkers.pcwaMarkers.removemarkers(map)
+            }
+        })
+
+    CALfireToggles.addEventListener('change', (elem) => {
+            const isChecked = elem.srcElement.checked
+            if (isChecked) {
+                addMarkers.fireMarkers.add_calfire_markers(map)
+            } else {
+                addMarkers.fireMarkers.remove_calfire_markers(map)
+            }
+        })
+
+    GOESfireToggles.addEventListener('change', (elem) => {
+            const isChecked = elem.srcElement.checked
+            if (isChecked) {
+                addMarkers.fireMarkers.add_goes_fire_pixels(map)
+            } else {
+                addMarkers.fireMarkers.remove_goesfire_markers(map)
+            }
+        })
+
+
+    // **********ANIMATION SLIDER CONTROLS***************
+    const dateSlider = document.getElementById("timelineScrubber");
+    const sliderTime = document.getElementById("timelineClock");
+    dateSlider.oninput = function(e) {
+        // Determine which layer to change
+        var tile_id = find_top_layer(map, null)
+
+        // When slider moves, stop all animations. Return value contains info on layer that stopped animating.
+        var tileLayer = tileSet.animateTiles(map,tile_id,null,false)   // Stop Tile Animation
+
+        // PAST --> PRESENT.
+        // We always want time to increase as slider moves to the right (or decreases as slider moves left).
+        // REQUIREMENTS: This code works because this.max was set by TileLoader when the tiles were loaded. We can
+        //               use this to take the this.value of the slider, subtract that from the max and invert the value
+        //               so that any non-forecast values will allow the slider to display PAST --> PRESENT as the
+        //               slider is pulled from left to right.
+        var frame = (parseInt(this.value) - parseInt(this.max)) * -1
+
+        // PRESENT --> FUTURE.
+        // If this is a forecast value, any movement to the right will increase time
+        if (tileLayer.forecastValue === true){
+            frame =  parseInt(this.value)
+        }
+
+        // Find all layers on map
+        var layers = map.getStyle().layers;
+
+        // Get All id's for this product (e.g. radar0, radar1, radar2, etc.)
+        const product_layers = layers.filter(item => item.id.includes(tile_id))
+
+        // Set raster opacity of every tile with this name to zero, except the tile you want to display (see below).
+        for (var product_layer of product_layers){
+            map.setPaintProperty(product_layer.id, 'raster-opacity', 0);
+        }
+
+        // Is the layer we want to display already loaded? If not, load it.
+        const found = layers.some(el => el.id === tile_id + '-tiles' + frame)
+        if (found === false){
+           tileSet.loadTiles(map,loader,tile_id,colorTexture.create(vMap, colorFunctionVisSat), false, frame)
+        }
+
+        // Set the opacity of the layer we want to view at 0.7
+        map.setPaintProperty(tile_id + '-tiles' + frame, 'raster-opacity', 0.7);
+
+        // Update the slider with the correct time display
+        var prettyTime = tileSet.range_slider_times(tile_id)
+        sliderTime.innerText = prettyTime[this.value]
+    }
+    //***********ANIMATION SLIDER END*******************
+
+
+    //***********OPACITY SLIDER START*****************
+    var opacitySlider = document.getElementById('opacity_slider');
+    opacitySlider.oninput = function() {
+        var layers = map.getStyle().layers;                                         // Find all layers
+        const raster_layers = layers.filter(item => item.type.includes('raster'))   // Only get layers of type raster
+        for (var product_layer of raster_layers) {
+            map.setPaintProperty(
+                product_layer.id,
+                'raster-opacity',
+                parseInt(this.value, 10) / 100
+            );
+        }
+    }
 });
+
+function find_top_layer(map, elem){
+    // Only animate the top most layer (the layer that was added last)
+    var layers = map.getStyle().layers;                             // Find all layers
+    const raster_layers = layers
+        .filter(item => item.type.includes('raster'))               // Only get layers of type raster
+    const top_raster = raster_layers.slice(-1)[0]                   // Top raster is last in list
+    // Check to make sure the user has actually added a raster to the map. If not, alert user.
+    if (top_raster == null){
+            M.toast({html: "Add a layer to the map first",
+                classes: 'red rounded', displayLength:3000});
+            return
+        }
+
+    // All of our raster layer id's have a digit after them (e.g. radar0, radar1). Remove all digits to get
+    // source id of the raster
+    let top_raster_id = (top_raster.source).replace(/[0-9]/g,'')
+
+    // The last layer the user added *should* be the top layer. Unless it's the satellite data, which
+    // has been purposely put below all other rasters (include symbol layers like highways).
+    if (elem != null) {
+        const last_raster_added = elem.getAttribute('data-animating')
+
+        // We could just say the layer to animate is always the last layer clicked, but instead we are double
+        // checking and making sure the the top layer is actually a raster. If the top layer is radar, but we
+        // clicked vis_sat last, this will animate vis_sat.
+        if (last_raster_added !== top_raster_id && last_raster_added === 'vis_sat') {
+            top_raster_id = 'vis_sat'
+        }
+    }
+    return top_raster_id
+}
+
 
 $('.switch #precip').on('change.bootstrapSwitch', function(e) {
     console.log(e)

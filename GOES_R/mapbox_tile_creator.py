@@ -13,11 +13,12 @@ import numpy as np
 
 
 class TileRBG:
-    def __init__(self, C, R_band, G_band, B_band):
+    def __init__(self, C, R_band, G_band, B_band, maxZoom):
         self.data = C
         self.R_band = R_band
         self.G_band = G_band
         self.B_band = B_band
+        self.tileMaxZoom = maxZoom
         self.mb_access_token = os.environ['MAPBOX_UPLOADER_TOKEN']
         self.CreateTiles = self.GOES17_Tile_Creation()
 
@@ -108,7 +109,7 @@ class TileRBG:
 
         tile_source = f'GOES17_{scan_start}.mbtiles'
         tile_id = f'GOES17_{scan_start}'
-        call([rio_path, 'mbtiles', '--format', 'PNG', '--overwrite', '--zoom-levels', '1..7', input_path, tile_source])
+        call([rio_path, 'mbtiles', '--format', 'PNG', '--overwrite', '--zoom-levels', f'1..{self.tileMaxZoom}', input_path, tile_source])
         uploader = Uploader(access_token=self.mb_access_token)
         tile_list = requests.get(f'https://api.mapbox.com/tilesets/v1/smotley?access_token={self.mb_access_token}')
         tile_list = json.loads(tile_list.text)
@@ -133,6 +134,6 @@ def delete_tilesets(tile_list, mb_access_token):
         tile_time = (tile_set['name']).split('GOES17_',1)[1]
         tile_time = datetime.strptime(tile_time, "%Y%m%d_%H%M").replace(tzinfo=pytz.utc)
         # Delete any images older than 4 hours.
-        if tile_time < (datetime.now(pytz.utc) - timedelta(hours=4)):
+        if tile_time < (datetime.now(pytz.utc) - timedelta(hours=6)):
             print("DELETING TILESET: "+tile_set['id'])
             d = requests.delete(f"https://api.mapbox.com/tilesets/v1/{tile_set['id']}?access_token={mb_access_token}")

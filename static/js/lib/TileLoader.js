@@ -279,6 +279,7 @@ function MBLAYER(layerOptions){
     this.hour_range=layerOptions.hour_range;
     this.hour_interval=layerOptions.hour_interval;
     this.timestamps=layerOptions.timestamps;
+    this.timeFormat=layerOptions.timeFormat
     this.ssecID=layerOptions.ssecID;
     this.layer_id=layerOptions.layer_id;
     this.paint=layerOptions.paint;
@@ -337,9 +338,10 @@ tileLayers.baseURL={
     //RADAR_STATIC:"http://radblast.wunderground.com/cgi-bin/radar/WUNIDS_composite?maxlat={{maxlat}}&maxlon={{maxlon}}&minlat={{minlat}}&minlon={{minlon}}&type=N0R&frame=0&num=1&delay=25&width={{width}}&height={{height}}&png=0&smooth=1&min=0&noclutter=1&rainsnow=1&nodebug=0&theext=.gif&timelabel=1&timelabel.x=200&timelabel.y=12&brand=wundermap&reproj.automerc=1",
     /*RADAR_STATIC:"http://radblast.wunderground.com/cgi-bin/radar/WUNIDS_composite?maxlat={{maxlat}}&maxlon={{maxlon}}&minlat={{minlat}}&minlon={{minlon}}&width={{width}}&height={{height}}&type=00Q&frame=0&num=1&delay=25&png=0&min=0&rainsnow=1&nodebug=0&theext=.gif&timelabel=0&timelabel.x=200&timelabel.y=12&brand=wundermap&smooth=1&radar_bitmap=1&noclutter=1&noclutter_mask=1&cors=1",*/
     //RADAR_ANIMATED:"http://radblast.wunderground.com/cgi-bin/radar/WUNIDS_composite?maxlat={{maxlat}}&maxlon={{maxlon}}&minlat={{minlat}}&minlon={{minlon}}&type=N0R&frame=0&num=7&delay=25&width={{width}}&height={{height}}&png=0&smooth=1&min=0&noclutter=1&rainsnow=1&nodebug=0&theext=.gif&merge=elev&reproj.automerc=1&timelabel=1&timelabel.x=200&timelabel.y=12&brand=wundermap",
-    VIS_SATELLITE: (tile_names,i) => `https://a.tiles.mapbox.com/v4/smotley.GOES_tiles/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic21vdGxleSIsImEiOiJuZUVuMnBBIn0.xce7KmFLzFd9PZay3DjvAA`,
+    VIS_SATELLITE: (tile_names,i) => `https://a.tiles.mapbox.com/v4/smotley.GOES17_${tile_names[i]}/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic21vdGxleSIsImEiOiJuZUVuMnBBIn0.xce7KmFLzFd9PZay3DjvAA`,
     //VIS_SATELLITE: (tile_names,i) => `https://re-c.ssec.wisc.edu/api/image?products=G17-ABI-CONUS-BAND02_${tile_names[0]}_${tile_names[1]}&z={z}&x={x}&y={y}`,
     //VIS_SATELLITE: (tile_names,i) => `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes-west-vis-1km-900913/{z}/{x}/{y}.png`
+    HRRR_SMOKE: (tile_names,i) => `https://re-c.ssec.wisc.edu/api/image?products=HRRR-smoke-surface_${tile_names[0]}_${tile_names[1]}&z={z}&x={x}&y={y}&accesskey=dd10b55a50f0f392700587fc3090368d`,
     //   IR_SATELLITE_NOWCOAST: "http://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/wwa_meteoceanhydro_longduration_hazards_time/MapServer/export?&bbox={{minlon}},{{minlat}},{{maxlon}},{{maxlat}}&format=png32&transparent=true&bgcolor=0xCCCCFE&SRS=EPSG:102100&size={{width}}%2C{{height}}&bboxSR=102100&imageSR=102100&f=image",
     // IR_SATELLITE_NOWCOAST: "http://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/sat_meteo_imagery_goes_time/MapServer/export?&bbox={{minlon}},{{minlat}},{{maxlon}},{{maxlat}}&format=png&transparent=true&bgcolor=0xCCCCFE&SRS=EPSG:3857&size={{width}}%2C{{height}}&bboxSR=3857&f=image",
     // IR_SATELLITE_NOWCOAST: "http://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/obs_meteocean_insitu_sfc_time/MapServer/export?&bbox={{minlon}},{{minlat}},{{maxlon}},{{maxlat}}&format=png&transparent=true&bgcolor=0xCCCCFE&SRS=EPSG:3857&size={{width}}%2C{{height}}&bboxSR=3857&IMAGESR=3857&f=image",
@@ -360,6 +362,7 @@ tileLayers.layer={
         ssecID: 'G17-ABI-CONUS-BAND02',
         URL:tileLayers.baseURL.VIS_SATELLITE,
         timestamps: null,
+        timeFormat: "%Y%m%d_%H%M",
         //layerType: 'data-driven-raster',
         layerType: "raster",
         tileSize: 256,
@@ -399,10 +402,12 @@ forecastValue:true,defaultOptions:null,defaultOpacity:30,autoRefresh:true,refres
             }
         }),
         URL:tileLayers.baseURL.RADAR_COMP,
-        timestamps: ['900913-m50m', '900913-m45m', '900913-m40m', '900913-m35m', '900913-m30m', '900913-m25m', '900913-m20m', '900913-m15m', '900913-m10m', '900913-m05m', '900913'],
+        timestamps: null,
+        fileTime: ['900913', '900913-m05m', '900913-m10m', '900913-m15m', '900913-m20m', '900913-m25m', '900913-m30m', '900913-m35m', '900913-m40m', '900913-m45m', '900913-m50m'],
+        timeFormat: "%Q",       // milleseconds since epoch
         zindex:6,
         currentValue:false,
-        forecastValue:true,
+        forecastValue:false,
         defaultOptions:null,
         defaultOpacity:60,
         safeOpacity:60,
@@ -420,11 +425,36 @@ forecastValue:true,defaultOptions:null,defaultOpacity:30,autoRefresh:true,refres
         modelRes: 500,
         paint: () => ({
             'raster-opacity': 0.5,
+            'raster-fade-duration': 0
+
+        }),
+        URL:tileLayers.baseURL.HRRR_REFL,
+        timestamps: null,
+        zindex:6,
+        currentValue:false,
+        forecastValue:true,
+        defaultOptions:null,
+        defaultOpacity:60,
+        safeOpacity:60,
+        autoRefresh:true,
+        refreshMinutes:2,
+        sortOrder:10,
+        title:"Standard current radar (source: wunderground.com)"}),
+
+    "hrrr_smoke":new MBLAYER({
+        source_type: 'iws',
+        source_id:"hrrr_smoke",
+        layer_id:"hrrr_smoke-tiles",
+        layerType:"raster",
+        tileSize: 256,
+        modelRes: 500,
+        paint: () => ({
+            'raster-opacity': 0.5,
             'raster-opacity-transition': {
                 'duration': 0
             }
         }),
-        URL:tileLayers.baseURL.HRRR_REFL,
+        URL:tileLayers.baseURL.HRRR_SMOKE,
         timestamps: null,
         zindex:6,
         currentValue:false,
@@ -454,7 +484,7 @@ forecastValue:true,defaultOptions:null,defaultOpacity:30,autoRefresh:true,refres
         timestamps: null,
         zindex:6,
         currentValue:false,
-        forecastValue:true,
+        forecastValue:false,
         defaultOptions:null,
         defaultOpacity:60,
         safeOpacity:60,
@@ -1264,46 +1294,69 @@ function roundDate(timeStamp, totalDays, hrInc){
 
 async function getProductTimes(product){
     const times = [];
-    if (product.timestamps === null) {
 
-        if (product.source_id === 'radar' || product.source_id === 'swe') {
-            times.push(['900913-m50m', '900913-m45m', '900913-m40m', '900913-m35m', '900913-m30m', '900913-m25m', '900913-m20m', '900913-m15m', '900913-m10m', '900913-m05m', '900913']);
-            return times
-        }
-        if (product.source_id === 'hrrr_refl') {
-            //HRRR goes out 18 hrs (18*15*4=1080)
-            for (var i = 0; i < (1080); i += 15) {
-                var padTime = ("000" + i).slice(-4)
-                times.push(padTime)
-            }
-            return times
-        }
-        if (product.source_type === 'ndfd') {
-            const localt = new Date()
-            const utcDate = new Date(localt.getTime() + localt.getTimezoneOffset() * 60000);
-            utcDate.setHours(0)
-            utcDate.setMinutes(0)
-            const timeSlots = Math.floor(product.hour_range / product.hour_interval);
-            const dateFormater = d3.timeFormat("%Y-%m-%dT%H:%M")
-            for (let i = 0; i < timeSlots; i++) {
-                const ftime = utcDate.setHours(utcDate.getHours() + (product.hour_interval))
-                times.push(dateFormater(ftime))
-            }
-            //times.reverse();
-            return times
-        }
-        if (product.source_id === 'vis_sat') {
-            var productID = product.ssecID;
-        const response = await fetch('https://realearth.ssec.wisc.edu/api/times?products=' + productID);
+    if (product.source_id === 'radar' || product.source_id === 'swe') {
+        const response = await fetch('https://mesonet.agron.iastate.edu/json/tms.json');
         const json = await response.json();
-        for (let i = 0; i < json[productID].length; i++) {
-            const datetime = json[productID][i].split('.')
+        const radar_info = json['services'].filter(item => item.id.includes('ridge_uscomp'))
+        if (radar_info !== null){
+            var formatTime = d3.utcParse("%Y-%m-%dT%H:%M:%S%Z")
+            var most_recent = formatTime(radar_info[0].utc_valid)
+            var most_recent_minutes = most_recent.getMinutes()
+            for(i=0; i<=50; i+=5){
+                // Time reported in milliseconds, so add i * one minute (in milliseconds) to the starting time.
+                var scanTime = most_recent.setMinutes(most_recent_minutes) + i*60000
+                times.push(scanTime)
+            }
+            tileLayers.layer[product.source_id].timestamps = times
+        }
+        // Radar is a special case where the fileNames do not have any time info associated with them. Instead of
+        // returning the timestamps in the fileNames, we need to return the fileNames themselves (needed for animation)
+        return [...tileLayers.layer[product.source_id].fileTime]
+        //times.reverse();
+        //times.push('900913-m50m', '900913-m45m', '900913-m40m', '900913-m35m', '900913-m30m', '900913-m25m', '900913-m20m', '900913-m15m', '900913-m10m', '900913-m05m', '900913');
+    }
+    if (product.source_id === 'hrrr_refl') {
+        //HRRR goes out 18 hrs (18*15*4=1080)
+        for (var i = 0; i < (1080); i += 15) {
+            var padTime = ("000" + i).slice(-4)
+            times.push(padTime)
+        }
+        //return times
+    }
+    if (product.source_type === 'ndfd') {
+        const localt = new Date()
+        const utcDate = new Date(localt.getTime() + localt.getTimezoneOffset() * 60000);
+        utcDate.setHours(0)
+        utcDate.setMinutes(0)
+        const timeSlots = Math.floor(product.hour_range / product.hour_interval);
+        const dateFormater = d3.timeFormat("%Y-%m-%dT%H:%M")
+        for (let i = 0; i < timeSlots; i++) {
+            const ftime = utcDate.setHours(utcDate.getHours() + (product.hour_interval))
+            times.push(dateFormater(ftime))
+        }
+        times.reverse();
+        //return times
+    }
+    if (product.source_id === 'vis_sat') {
+        var productID = product.ssecID;
+        const response = await fetch('https://api.mapbox.com/tilesets/v1/smotley?access_token=sk.eyJ1Ijoic21vdGxleSIsImEiOiJja2NjYnZ4Z3AwMzZ2MnJwcWV0dmxrcDQzIn0.qheNdC3aHpFz1T1uPTKKug');
+        const json = await response.json();
+        const goes_obj = json.filter(item => item.name.includes('GOES17_'))
+        for (let i = 0; i < goes_obj.length; i++) {
+            const datetime = (goes_obj[i]['name']).split('GOES17_')[1]
             times.push(datetime)
             }
-        }
-        //times.reverse();
-        product.timestamps = times;
+        times.reverse();
     }
+    //times.reverse();
+    // I have absolutely no idea why we have to do the array this way. If we just say = time (i.e. not [time])
+    // then the array will not copy over all the elements. The concat.apply removes the outer nested array
+    // (i.e. the [["1,"2",...]] becomes ["1","2",...] )
+    //tileLayers.layer[product.source_id].timestamps = []
+    tileLayers.layer[product.source_id].timestamps = times
+    //tileLayers.layer[product.source_id].timestamps = [].concat.apply([], tileLayers.layer[product.source_id].timestamps)
+
 
     return product.timestamps;
 }
@@ -1357,7 +1410,8 @@ export default class TileLoader{
      * @return {Promise.<object>}  A Promise which resolves with GeoJSON data
      *   sampled from the grid
      */
-    loadTiles(map,loader,frames,product,texture) {
+    loadTiles(map,loader,product,texture, animate, frameNumber=null) {
+
         // Use this to find the top layer so that we can put highways and stuff above any layer:
         // see: https://docs.mapbox.com/mapbox-gl-js/example/geojson-layer-in-stack/ for more
         var layers = map.getStyle().layers;
@@ -1372,6 +1426,7 @@ export default class TileLoader{
         if (tileLayers.layer[product].source_id != 'vis_sat'){
                 firstSymbolId = null
             }
+
         /*const progressBar = new ProgressPromise((resolve, reject, progress) => {
             setTimeout(() => progress(25), 250);
         })
@@ -1382,10 +1437,23 @@ export default class TileLoader{
             .progress(value => console.log(value + '%'))
             .then(() => console.log('Done'));
             */
-        getProductTimes(tileLayers.layer[product]).then(tileNames => {
-            console.log(tileNames)
-            tileNames.splice(0, tileNames.length - frames)
+
+        getProductTimes(tileLayers.layer[product]).then(timeStampsClone => {
+            var tileNames = [...timeStampsClone]
+            var frames = 1
+
+            // Set max value for timeline scrubber.
+            $('#timelineScrubber')[0].max = tileNames.length - 1
+            if (animate === true){
+                frames = tileNames.length
+            }
+            // Note: We already got the tile time's from Iowa state's site. But the tiles have static names.
+            //tileNames.splice(0, tileNames.length - frames)
             for (let i = 0; i < frames; i++) {
+                // The request to load frames is coming from the slider. So only load tiles for that specific frame
+                if (frameNumber!== null){
+                    i = frameNumber
+                }
                 const url = tileLayers.layer[product]['URL'](tileNames,i)
                 //The first image will be visible, all others will be transparent until animation starts
                 if (i > 0) texture = colorTexture.create([undefined], colorFunctionVisSat);
@@ -1396,14 +1464,13 @@ export default class TileLoader{
                         "tiles": [url],
                         "tileSize": tileLayers.layer[product].tileSize
                     });
+                    console.log("added Source: ", tileLayers.layer[product].source_id + i)
                 }
                 catch(err){
                     //If source already exists, update the url anyway
                     map.getSource(tileLayers.layer[product].source_id + i).tiles = [url];
                     console.log(err, " Adding Layer Back to map")
                 }
-
-
                     map.addLayer({
                         "id": tileLayers.layer[product].layer_id + i,
                         "type": tileLayers.layer[product].layerType,
@@ -1415,17 +1482,18 @@ export default class TileLoader{
                         firstSymbolId
                     );
             }
-        if (frames > 1){
-            this.animateTiles(map, product, frames, true)
-        }
+
+            if (animate===true){
+                this.animateTiles(map, product, tileNames.length, true)
+            }
         })
         if (tileLayers.layer[product].source_type === 'ndfd'){
             getNDFDcolormap(tileLayers.layer[product].ndfd_name).then(colorkey => {
                 colormap = colorkey
             })
         }
-
     };
+
     removeTiles(map,product){
         const all_layers = map.getStyle().layers;
         all_layers.forEach(layer => {
@@ -1514,16 +1582,6 @@ export default class TileLoader{
     }
 
     animateTiles(map,product,frames,animation) {
-        var frameCount = frames;
-        var frame = frameCount - 1;
-        var tile_id = tileLayers.layer[product].layer_id
-        function loop(){
-                map.setPaintProperty(tile_id + frame, 'raster-opacity', 0);
-                //map.setPaintProperty('circle-layer' + frame, 'fill-extrusion-opacity', 0);
-                frame = (frame + 1) % frameCount;
-                map.setPaintProperty(tile_id + frame, 'raster-opacity', 0.7);
-                //map.setPaintProperty('circle-layer' + frame, 'fill-extrusion-opacity', 0.8);
-        }
         if (animation === true){
             imgLooper = setInterval(function(){
                 loop()
@@ -1531,6 +1589,48 @@ export default class TileLoader{
         }
         if (animation === false){
             clearInterval(imgLooper)
+            return tileLayers.layer[product]
         }
+        var product_times = tileLayers.layer[product].timestamps
+        var prettyTime = this.range_slider_times(product)
+        var frameCount = product_times.length;
+        var frame = frameCount - 1;
+        var tile_id = tileLayers.layer[product].layer_id
+        var dateSlider = document.getElementById("timelineClock");
+        $('#timelineScrubber')[0].max = frameCount - 1
+        dateSlider.oninput = function() {
+            clearInterval(imgLooper)
+            map.setPaintProperty(tile_id + this.value, 'raster-opacity', 0);
+            map.setPaintProperty(tile_id + this.value + 1, 'raster-opacity', 0.7);
+            dateSlider.innerText = prettyTime[this.value]
+            }
+        function loop(){
+            dateSlider.innerText = prettyTime[frame]
+            $('#timelineScrubber')[0].value = frameCount - frame
+            map.setPaintProperty(tile_id + frame, 'raster-opacity-transition', {duration:0, delay:0});
+            map.setPaintProperty(tile_id + frame, 'raster-opacity', 0);
+            frame = (frame + 1) % frameCount;
+            map.setPaintProperty(tile_id + frame, 'raster-opacity', 0.7);
+        }
+
     }
+
+    range_slider_times(product){
+        var product_times = tileLayers.layer[product].timestamps
+        var product_time_format = tileLayers.layer[product].timeFormat
+        return timeFormater(product_times, product_time_format)
+    }
+
+}
+
+function timeFormater(product_times, product_time_format){
+    var pretty_times = []
+    var formatTime = d3.utcParse(product_time_format)
+    var prettyFormat = d3.timeFormat("%a %I:%M%p")
+    for(const t in product_times){
+        var dateObj = formatTime(product_times[t])
+        var dateString = prettyFormat(dateObj)
+        pretty_times.push(dateString)
+    }
+    return pretty_times
 }

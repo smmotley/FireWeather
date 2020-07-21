@@ -23,6 +23,7 @@ t1 = Timeloop()
 # Analise only the most recent file in the S3 bucket.
 most_recent_scan = False
 save_png_to_db = True
+rioMaxZoomResolution = '6'  # Max Zoom for tile creation (For CONUS, 8 gives max res. For MESO 10 gives max).
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db.sqlite3')
 CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
 CURSOR = CONN.cursor()
@@ -53,6 +54,8 @@ def main():
         bands=[7, 8],
         bucket=bucket,
         st_dt=first_scan,
+        #domain='MESO1',
+        domain="CONUS",
         hrs=hours_of_data)
 
     goes_multiband_files = goes_multiband.bucket_files
@@ -63,6 +66,8 @@ def main():
         goes_multiband = AwsGOES(
             bands=[7, 8],
             bucket=bucket,
+            #domain='MESO1',
+            domain="CONUS",
             st_dt=first_scan,
             hrs=hours_of_data)
         try:
@@ -88,9 +93,15 @@ def main():
 
         midpoint = str(C['t'].data)[:-10]
         DATE = datetime.strptime(midpoint, '%Y-%m-%dT%H:%M:%S')
+        DATE = DATE.replace(tzinfo=pytz.UTC)
+
 
         RGB_bands = Fire_Image(C=C, fileName=FILE).Composite
-        tiles = TileRBG(C=C, R_band=RGB_bands['R_band'], B_band=RGB_bands['B_band'], G_band=RGB_bands['G_band']).CreateTiles
+        tiles = TileRBG(C=C,
+                        R_band=RGB_bands['R_band'],
+                        B_band=RGB_bands['B_band'],
+                        G_band=RGB_bands['G_band'],
+                        maxZoom=rioMaxZoomResolution).CreateTiles
 
         png_blob = None
         if save_png_to_db:
@@ -138,15 +149,18 @@ def png_db(C, composite_img, DATE):
 
     plt.title('GOES-17 True Color', loc='left', fontweight='semibold', fontsize=15)
     plt.title('%s' % DATE.strftime('%d %B %Y %H:%M UTC '), loc='right');
-    plt.savefig('test.png')
 
     buf = io.BytesIO()
     plt.savefig(buf, bbox_inches='tight', format='png')
     buf.seek(0)
 
     ablob = buf.getvalue()
+    plt.close()
+    buf.close()
     return ablob
 
+
+            ################ EXTRA FUNCTIONS ###################
 def extract_gif(scan_time):
     # sql = "SELECT fire_temp_gif FROM goes_r_images WHERE scan_dt = ? AND fire_temp_gif NOT NULL"
     sql = "SELECT fire_temp_image FROM goesFire_goesimages WHERE scan_dt = ? AND fire_temp_image NOT NULL"
@@ -224,6 +238,8 @@ def forced_loop_creator(goes_multiband, center_lnglat, bucket, s3, starting_time
     # CURSOR.execute(sql, [fire_id])
     # CONN.commit()
     return
+            ################ END EXTRA FUNCTIONS ###################
+
 
 
 if __name__ == "__main__":

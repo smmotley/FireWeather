@@ -8,8 +8,8 @@
     <script type="text/javascript" src="{% static "js/fusioncharts.js" %}"></script>
     <script type="text/javascript" src="{% static "js/themes/fusioncharts.theme.fusion.js" %}"></script>
     <!-- Mapbox JS-->
-    <script src='https://api.mapbox.com/mapbox-gl-js/v1.10.1/mapbox-gl.js'></script>
-    <link href='https://api.mapbox.com/mapbox-gl-js/v1.10.1/mapbox-gl.css' rel='stylesheet' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/v1.11.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v1.11.1/mapbox-gl.css' rel='stylesheet' />
 {% endblock %}
 
 {% block content %}
@@ -23,7 +23,32 @@
     </div>
     <div id="mapbox_map" class="col s12">
         <div class="card-pannel z-depth-2">
-        <div id="map" class="map map-big"></div>
+        <div id="map" class="map map-big">
+            <div classname="timeline" class="timeline">
+                <button title="Play/Pause Past Weather" value="paused" data-animating="nothing" id="animate">
+                    <i class="material-icons pause_play_button">play_circle_outline</i>
+                    <div class="label">Past</div>
+                </button>
+                <div class="scrubberControl">
+                    <div id="timelineClock" classname="timestamp" class="timestamp">Date</div>
+                    <div>
+                        <div classname="range-field" class="range-field">
+                            <input type="range" min="0" max="23" dir="ltr" id="timelineScrubber" aria-label="rangeslider" classname="rangeSlider" value="23" class="rangeSlider" style="background-size: 98% 100%;">
+                        </div>
+                    </div>
+                </div>
+                <button title="Play/Pause Future Weather" id="future">
+                    <i class="material-icons">play_circle_outline</i>
+                    <div class="label">Future</div>
+                </button>
+                <div class="speedControl">
+                    <button title="Change Animation Speed">
+                        <i class="material-icons">fast_forward</i>
+                        <div class="label">2x</div>
+                    </button>
+                </div>
+            </div>
+            </div>
             <script type="text/javascript">
                 fire_data = {{ fire_data|safe }}
                     goes_fire_pixels = {{ goes_fire_pixels|safe }}

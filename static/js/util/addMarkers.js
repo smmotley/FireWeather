@@ -4,6 +4,9 @@ import * as something_clicked from "./marker_clicked.js";
 
 var el_fav1 = document.getElementsByClassName("delete_location_fav1");
 var el_fav2 = document.getElementsByClassName("delete_location_fav2");
+var PCWA_markers = []
+var CALFIRE_markers = []
+var GOES_markers = []
 Array.from(el_fav1).forEach(function(element) {
       element.addEventListener("click", () => delete_point('fav1'))
     });
@@ -37,8 +40,9 @@ function json2geojson(json){
 return geojson
 }
 
-export function pcwaMarkers(map){
-d3.json('/static/site_data/station_locations.json')
+export class pcwaMarkers{
+    static addmarkers(map){
+        d3.json('/static/site_data/station_locations.json')
         .then((data) => {
             geojson = json2geojson(data);
             geojson.features.forEach(function(feature){
@@ -64,10 +68,12 @@ d3.json('/static/site_data/station_locations.json')
                     closeOnClick: true
                 }).setHTML(feature.properties.id +'<br>'+ feature.properties.info);
 
-                new mapboxgl.Marker(el)
+                var single_marker = new mapboxgl.Marker(el)
                         .setLngLat(feature.geometry.coordinates)
                         .addTo(map)
                         .setPopup(popup);
+                        PCWA_markers.push(single_marker)
+
                 el.addEventListener('click', (e) =>
                 {
                    let station_name = (e.target.id).split("_");
@@ -86,212 +92,295 @@ d3.json('/static/site_data/station_locations.json')
                    popup.remove();
                    //console.log(station_name);
                 })
-
             });
         });
+        }
+    static removemarkers(){
+        for (var i = PCWA_markers.length - 1; i >=0; i --){
+            PCWA_markers[i].remove()
+        }
+    }
+
 }
 
-export function fireMarkers(map){
-    fire_data.features.forEach(function(feature){
-        // create a HTML element for each feature
-                var el = document.createElement('div');
-                el.className = 'fire_marker';
-                el.id = 'fire_marker_' + feature.properties.id;
-                if (feature.properties.type != 'POWERHOUSE'){
-                        el.style.backgroundImage = 'url(/static/images/map_markers/fire_marker.png)';
-                        el.style.width = '25px';
-                        el.style.height = '30px';
-                    }
+export class fireMarkers {
+    static add_calfire_markers(map) {
+        fire_data.features.forEach(function (feature) {
+            // create a HTML element for each feature
+            var el = document.createElement('div');
+            el.className = 'fire_marker';
+            el.id = 'fire_marker_' + feature.properties.id;
+            if (feature.properties.type != 'POWERHOUSE') {
+                el.style.backgroundImage = 'url(/static/images/map_markers/fire_marker.png)';
+                el.style.width = '25px';
+                el.style.height = '30px';
+            }
 
-                let popup = new mapboxgl.Popup({
-                    offset: 25,
-                    closeButton: true,
-                    closeOnClick: true
-                }).setHTML(
-                    "    <div class=\"col s12 m6\">\n" +
-                    "      <div class=\"card\">\n" +
-                    "        <div class=\"card-image\"> <img src=\"data:image/png;base64," + goes_image + "\">\n" +
-                    "          <span class=\"card-title\">" + feature.properties.fire_name + "</span>\n" +
-                    "          <p>I am a very simple card. I am good at containing small bits of information.\n" +
-                    "          I am convenient because I require little markup to use effectively.</p>\n" +
-                    "        </div>\n" +
-                    "        <div class=\"card-action\">\n" +
-                    "          <a href=\" "+ feature.properties.fire_url +  "\">Additional Fire Info</a>\n" +
-                    "          <a href=\"#\">This is a link</a>\n" +
-                    "        </div>\n" +
-                    "      </div>\n" +
-                    "    </div>\n");
+            let popup = new mapboxgl.Popup({
+                offset: 25,
+                closeButton: true,
+                closeOnClick: true
+            }).setHTML(
+                "    <div class=\"col s12 m6\">\n" +
+                "      <div class=\"card\">\n" +
+                "        <div class=\"card-image\"> <img src=\"data:image/png;base64," + goes_image + "\">\n" +
+                "          <span class=\"card-title\">" + feature.properties.fire_name + "</span>\n" +
+                "          <p>I am a very simple card. I am good at containing small bits of information.\n" +
+                "          I am convenient because I require little markup to use effectively.</p>\n" +
+                "        </div>\n" +
+                "        <div class=\"card-action\">\n" +
+                "          <a href=\" " + feature.properties.fire_url + "\">Additional Fire Info</a>\n" +
+                "          <a href=\"#\">This is a link</a>\n" +
+                "        </div>\n" +
+                "      </div>\n" +
+                "    </div>\n");
 
-                new mapboxgl.Marker(el)
-                        .setLngLat(feature.geometry.coordinates)
-                        .addTo(map)
-                        .setPopup(popup);
-                el.addEventListener('click', (e) =>
-                {
-                   let station_name = (e.target.id).split("_");
-                   //console.log(station_name);
-                   something_clicked.marker_clicked(station_name[1])
-                })
-                el.addEventListener('mouseover', (e) =>
-                {
-                   let station_name = (e.target.id).split("_");
-                   popup.addTo(map);
-                   //console.log(station_name);
-                })
-                el.addEventListener('mouseout', (e) =>
-                {
-                   let station_name = (e.target.id).split("_");
-                   popup.remove();
-                   //console.log(station_name);
-                })
+            var single_marker = new mapboxgl.Marker(el)
+                .setLngLat(feature.geometry.coordinates)
+                .addTo(map)
+                .setPopup(popup);
 
-        });
+            // In doing this, we can call these markers outside of this scope.
+            CALFIRE_markers.push(single_marker)
 
-    goes_fire_pixels.features.forEach(function(feature){
-        // create a HTML element for each feature
-                var el = document.createElement('div');
-                el.className = 'goes_marker';
-                el.id = 'goes_marker_' + feature.properties.id;
-                if (feature.properties.type == 'goes_pixel'){
-                        el.style.backgroundImage = 'url(/static/images/map_markers/fire_marker_blue.png)';
-                        el.style.width = '25px';
-                        el.style.height = '30px';
-                    }
-
-                let popup = new mapboxgl.Popup({
-                    offset: 25,
-                    closeButton: true,
-                    closeOnClick: true
-                }).setHTML(
-                    "    <div class=\"col s12 m6\">\n" +
-                    "      <div class=\"card\">\n" +
-                    "        <div class=\"card-image\"> <img src=\"data:image/png;base64," + goes_image + "\">\n" +
-                    "          <span class=\"card-title\">" + feature.properties.fire_name + "</span>\n" +
-                    "          <p>I am a very simple card. I am good at containing small bits of information.\n" +
-                    "          I am convenient because I require little markup to use effectively.</p>\n" +
-                    "        </div>\n" +
-                    "        <div class=\"card-action\">\n" +
-                    "          <a href=\" "+ feature.properties.fire_url +  "\">Additional Fire Info</a>\n" +
-                    "          <a href=\"#\">This is a link</a>\n" +
-                    "        </div>\n" +
-                    "      </div>\n" +
-                    "    </div>\n");
-
-                new mapboxgl.Marker(el)
-                        .setLngLat(feature.geometry.coordinates)
-                        .addTo(map)
-                        .setPopup(popup);
-                el.addEventListener('click', (e) =>
-                {
-                   let station_name = (e.target.id).split("_");
-                   //console.log(station_name);
-                   something_clicked.marker_clicked(station_name[1])
-                })
-                el.addEventListener('mouseover', (e) =>
-                {
-                   let station_name = (e.target.id).split("_");
-                   popup.addTo(map);
-                   //console.log(station_name);
-                })
-                el.addEventListener('mouseout', (e) =>
-                {
-                   let station_name = (e.target.id).split("_");
-                   popup.remove();
-                   //console.log(station_name);
-                })
+            el.addEventListener('click', (e) => {
+                let station_name = (e.target.id).split("_");
+                //console.log(station_name);
+                something_clicked.marker_clicked(station_name[1])
+            })
+            el.addEventListener('mouseover', (e) => {
+                let station_name = (e.target.id).split("_");
+                popup.addTo(map);
+                //console.log(station_name);
+            })
+            el.addEventListener('mouseout', (e) => {
+                let station_name = (e.target.id).split("_");
+                popup.remove();
+                //console.log(station_name);
+            })
 
         });
-    var size = 200;
-    // implementation of CustomLayerInterface to draw a pulsing dot icon on the map
-    // see https://docs.mapbox.com/mapbox-gl-js/api/#customlayerinterface for more info
-    var pulsingDot = {
-        width: size,
-        height: size,
-        data: new Uint8Array(size * size * 4),
+    }
+
+    static add_goes_fire_pixels(map) {
+        map.addSource('goes_fire_points', {
+                type: 'geojson',
+                data: goes_fire_pixels
+                });
+
+        map.addLayer({
+            'id': 'goes_fire_points',
+            'type': 'circle',
+            'source': 'goes_fire_points',
+            'paint': {
+                // make circles larger as the user zooms from z12 to z22
+                'circle-radius': 8,
+                'circle-stroke-width': 1,
+                'circle-stroke-color': '#333',
+                // color circles by ethnicity, using a match expression
+                // https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-match
+                'circle-color': [
+                    'case',
+                    ["<", ["get", "scan_dt"], (24*2)], "#fb3b68",       // Pixel less than 2 days old
+                    [">", ["get", "scan_dt"], (24*2)], "#ff903b",       // Pixel more than 2 days old
+                    [">", ["get", "scan_dt"], (24*4)], "#e5cf5e",       // Pixel more than 4 days old
+                    [">", ["get", "scan_dt"], (24*6)], "#7f9d92",
+                    [">", ["get", "scan_dt"], (24*8)], "#b4e8f5",
+                    /* other */ '#ccc'
+                ]
+            }
+        });
+
+
+         map.on('click', 'goes_fire_points', function(e) {
+            var coordinates = e.features[0].geometry.coordinates.slice();
+            var description = e.features[0].properties.description;
+
+            // Ensure that if the map is zoomed out such that multiple
+            // copies of the feature are visible, the popup appears
+            // over the copy being pointed to.
+            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+            }
+
+            new mapboxgl.Popup({className: "goes_fire_popup"})
+                .setLngLat(coordinates)
+                .setHTML(description)
+                .addTo(map);
+            });
+
+            // Change the cursor to a pointer when the mouse is over the places layer.
+            map.on('mouseenter', 'goes_fire_points', function() {
+            map.getCanvas().style.cursor = 'pointer';
+            });
+
+            // Change it back to a pointer when it leaves.
+            map.on('mouseleave', 'goes_fire_points', function() {
+            map.getCanvas().style.cursor = '';
+        });
+
+
+        /*
+        goes_fire_pixels.features.forEach(function (feature) {
+            // create a HTML element for each feature
+            var el = document.createElement('div');
+            el.className = 'goes_marker';
+            el.id = 'goes_marker_' + feature.properties.id;
+            if (feature.properties.type == 'goes_pixel') {
+                el.style.backgroundImage = 'url(/static/images/map_markers/fire_marker_blue.png)';
+                el.style.width = '25px';
+                el.style.height = '30px';
+            }
+
+            let popup = new mapboxgl.Popup({
+                offset: 25,
+                closeButton: true,
+                closeOnClick: true
+            }).setHTML(
+                "    <div class=\"col s12 m6\">\n" +
+                "      <div class=\"card\">\n" +
+                "        <div class=\"card-image\"> <img src=\"data:image/png;base64," + goes_image + "\">\n" +
+                "          <span class=\"card-title\">" + feature.properties.fire_name + "</span>\n" +
+                "          <p>I am a very simple card. I am good at containing small bits of information.\n" +
+                "          I am convenient because I require little markup to use effectively.</p>\n" +
+                "        </div>\n" +
+                "        <div class=\"card-action\">\n" +
+                "          <a href=\" " + feature.properties.fire_url + "\">Additional Fire Info</a>\n" +
+                "          <a href=\"#\">This is a link</a>\n" +
+                "        </div>\n" +
+                "      </div>\n" +
+                "    </div>\n");
+
+            var single_marker = new mapboxgl.Marker(el)
+                .setLngLat(feature.geometry.coordinates)
+                .addTo(map)
+                .setPopup(popup);
+
+            // In doing this, we can call these markers outside of this scope.
+            GOES_markers.push(single_marker)
+
+            el.addEventListener('click', (e) => {
+                let station_name = (e.target.id).split("_");
+                //console.log(station_name);
+                something_clicked.marker_clicked(station_name[1])
+            })
+            el.addEventListener('mouseover', (e) => {
+                let station_name = (e.target.id).split("_");
+                popup.addTo(map);
+                //console.log(station_name);
+            })
+            el.addEventListener('mouseout', (e) => {
+                let station_name = (e.target.id).split("_");
+                popup.remove();
+                //console.log(station_name);
+            })
+
+        }); */
+    }
+    static remove_calfire_markers(){
+        for (var i = CALFIRE_markers.length - 1; i >=0; i --){
+            CALFIRE_markers[i].remove()
+        }
+    }
+
+     static remove_goesfire_markers(){
+        for (var i = GOES_markers.length - 1; i >=0; i --){
+            GOES_markers[i].remove()
+        }
+    }
+    add_pulsing_dot(map) {
+        var size = 200;
+        // implementation of CustomLayerInterface to draw a pulsing dot icon on the map
+        // see https://docs.mapbox.com/mapbox-gl-js/api/#customlayerinterface for more info
+        var pulsingDot = {
+            width: size,
+            height: size,
+            data: new Uint8Array(size * size * 4),
 
 // get rendering context for the map canvas when layer is added to the map
-        onAdd: function () {
-            var canvas = document.createElement('canvas');
-            canvas.width = this.width;
-            canvas.height = this.height;
-            this.context = canvas.getContext('2d');
-        },
+            onAdd: function () {
+                var canvas = document.createElement('canvas');
+                canvas.width = this.width;
+                canvas.height = this.height;
+                this.context = canvas.getContext('2d');
+            },
 
 // called once before every frame where the icon will be used
-        render: function () {
-            var duration = 1000;
-            var t = (performance.now() % duration) / duration;
+            render: function () {
+                var duration = 1000;
+                var t = (performance.now() % duration) / duration;
 
-            var radius = (size / 2) * 0.3;
-            var outerRadius = (size / 2) * 0.7 * t + radius;
-            var context = this.context;
+                var radius = (size / 2) * 0.3;
+                var outerRadius = (size / 2) * 0.7 * t + radius;
+                var context = this.context;
 
 // draw outer circle
-            context.clearRect(0, 0, this.width, this.height);
-            context.beginPath();
-            context.arc(
-                this.width / 2,
-                this.height / 2,
-                outerRadius,
-                0,
-                Math.PI * 2
-            );
-            context.fillStyle = 'rgba(255, 200, 200,' + (1 - t) + ')';
-            context.fill();
+                context.clearRect(0, 0, this.width, this.height);
+                context.beginPath();
+                context.arc(
+                    this.width / 2,
+                    this.height / 2,
+                    outerRadius,
+                    0,
+                    Math.PI * 2
+                );
+                context.fillStyle = 'rgba(255, 200, 200,' + (1 - t) + ')';
+                context.fill();
 
 // draw inner circle
-            context.beginPath();
-            context.arc(
-                this.width / 2,
-                this.height / 2,
-                radius,
-                0,
-                Math.PI * 2
-            );
-            context.fillStyle = 'rgba(255, 100, 100, 1)';
-            context.strokeStyle = 'white';
-            context.lineWidth = 2 + 4 * (1 - t);
-            context.fill();
-            context.stroke();
+                context.beginPath();
+                context.arc(
+                    this.width / 2,
+                    this.height / 2,
+                    radius,
+                    0,
+                    Math.PI * 2
+                );
+                context.fillStyle = 'rgba(255, 100, 100, 1)';
+                context.strokeStyle = 'white';
+                context.lineWidth = 2 + 4 * (1 - t);
+                context.fill();
+                context.stroke();
 
 // update this image's data with data from the canvas
-            this.data = context.getImageData(
-                0,
-                0,
-                this.width,
-                this.height
-            ).data;
+                this.data = context.getImageData(
+                    0,
+                    0,
+                    this.width,
+                    this.height
+                ).data;
 
 // continuously repaint the map, resulting in the smooth animation of the dot
-            map.triggerRepaint();
+                map.triggerRepaint();
 
 // return `true` to let the map know that the image was updated
-            return true;
-        }
-    };
+                return true;
+            }
+        };
 
-    map.addImage('pulsing-dots', pulsingDot, { pixelRatio: 2 });
-    map.addSource('dot-points', {
-                    'type': 'geojson',
-                    'data': {
-                        'type': 'FeatureCollection',
-                        'features': [{
-                            'type': 'Feature',
-                            'geometry': {
-                                'type': 'Point',
-                                'coordinates': [-120, 39]
-                            }
-                        }]
+        map.addImage('pulsing-dots', pulsingDot, {pixelRatio: 2});
+        map.addSource('dot-points', {
+            'type': 'geojson',
+            'data': {
+                'type': 'FeatureCollection',
+                'features': [{
+                    'type': 'Feature',
+                    'geometry': {
+                        'type': 'Point',
+                        'coordinates': [-120, 39]
                     }
-    });
-    map.addLayer({
+                }]
+            }
+        });
+        map.addLayer({
             'id': 'dot-points',
             'type': 'symbol',
             'source': 'dot-points',
             'layout': {
-            'icon-image': 'pulsing-dot'
+                'icon-image': 'pulsing-dot'
             }
-            });
+        });
+    }
 }
 
 var createGeoJSONCircle = function(center, radiusInKm, points) {

@@ -360,3 +360,46 @@ footer.page-footer {
     opacity: 0.2;
   }
 }
+
+.timeline{
+  left: 50%;
+    -webkit-transform: translate(-55%);
+    -ms-transform: translate(-55%);
+    transform: translate(-55%);
+      border: 1px solid #dadada;
+    box-shadow: 0 0 4px 0 rgba(0,0,0,.25);
+    background: hsla(0,0%,100%,.9);
+  display: -webkit-box;
+    display: -webkit-flex;
+    display: -ms-flexbox;
+    display: flex;
+    position: absolute;
+    -webkit-box-orient: horizontal;
+    -webkit-box-direction: normal;
+    -webkit-flex-flow: row nowrap;
+    -ms-flex-flow: row nowrap;
+    flex-flow: row nowrap;
+    -webkit-box-align: stretch;
+    -webkit-align-items: stretch;
+    -ms-flex-align: stretch;
+    align-items: stretch;
+    width: auto;
+    bottom: 30px;
+    opacity: 1;
+    -webkit-transition: all 1s;
+    transition: all 1s;
+  z-index: 1;
+}
+
+.speedControl{
+  border-left: 1px solid #ccc;
+  max-width: 90px;
+  padding: 3px 10px 0;
+}
+
+.scrubberControl{
+  padding: 10px;
+    text-align: center;
+    background: none;
+    border: 0;
+}
