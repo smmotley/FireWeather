@@ -8409,3 +8409,7 @@ nav.navbar ul a:focus {
  color: red;
 }
 
+table.highlight>tbody>tr:hover {
+    background-color: rgba(146, 240, 243, 0.5) !important;
+}
+

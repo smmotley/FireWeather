@@ -8,6 +8,7 @@ import * as colorTexture from './lib/color-texture.js';
 import TempDisplay from "./lib/temp-display.js"
 //import pulsingDot from "./util/pulsingDot.js";
 import * as addMarkers from "./util/addMarkers.js";
+import * as currentFireTable from "./util/tableSort.js"
 
 mapboxgl.accessToken = JSON.parse(document.getElementById('create-map').textContent);
 
@@ -458,6 +459,27 @@ createMap(map => {
             );
         }
     }
+    //***********OPACITY SLIDER END*****************
+
+    // Initiate the table sorting function on our current fires list
+    currentFireTable
+
+    $(document).ready(function () {
+		$(".fire_in_table").click(function () {
+			addMarkers.fireMarkers.add_goes_fire_pixels(map)
+			GOESfireToggles.checked = true
+			var el = document.getElementById("dashboard_tabs")
+			var map_tabs = M.Tabs.getInstance(el);
+			map_tabs.select('mapbox_map')
+			map.flyTo({
+				center: [parseFloat(this.dataset.fire_lng), parseFloat(this.dataset.fire_lat),],
+                zoom: 9,
+				essential: true // this animation is considered essential with respect to prefers-reduced-motion
+
+			});
+		});
+	})
+
 });
 
 function find_top_layer(map, elem){
@@ -492,8 +514,8 @@ function find_top_layer(map, elem){
     return top_raster_id
 }
 
-
 $('.switch #precip').on('change.bootstrapSwitch', function(e) {
     console.log(e)
     var test = something_clicked.change_graph_type(e)
 });
+

@@ -1,7 +1,6 @@
 import * as something_clicked from "./marker_clicked.js";
 
 // Event listeners for deleting a point:
-
 var el_fav1 = document.getElementsByClassName("delete_location_fav1");
 var el_fav2 = document.getElementsByClassName("delete_location_fav2");
 var PCWA_markers = []
@@ -163,62 +162,69 @@ export class fireMarkers {
     }
 
     static add_goes_fire_pixels(map) {
-        map.addSource('goes_fire_points', {
+        // Layer has already been loaded
+        if (map.getSource('goes_fire_points')){
+            map.setLayoutProperty('goes_fire_points', 'visibility', 'visible');
+        }
+        // Layer Not Loaded yet
+        else {
+            map.addSource('goes_fire_points', {
                 type: 'geojson',
                 data: goes_fire_pixels
-                });
+            });
 
-        map.addLayer({
-            'id': 'goes_fire_points',
-            'type': 'circle',
-            'source': 'goes_fire_points',
-            'paint': {
-                // make circles larger as the user zooms from z12 to z22
-                'circle-radius': 8,
-                'circle-stroke-width': 1,
-                'circle-stroke-color': '#333',
-                // color circles by ethnicity, using a match expression
-                // https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-match
-                'circle-color': [
-                    'case',
-                    ["<", ["get", "scan_dt"], (24*2)], "#fb3b68",       // Pixel less than 2 days old
-                    [">", ["get", "scan_dt"], (24*2)], "#ff903b",       // Pixel more than 2 days old
-                    [">", ["get", "scan_dt"], (24*4)], "#e5cf5e",       // Pixel more than 4 days old
-                    [">", ["get", "scan_dt"], (24*6)], "#7f9d92",
-                    [">", ["get", "scan_dt"], (24*8)], "#b4e8f5",
-                    /* other */ '#ccc'
-                ]
-            }
-        });
+            map.addLayer({
+                'id': 'goes_fire_points',
+                'type': 'circle',
+                'source': 'goes_fire_points',
+                'paint': {
+                    // make circles larger as the user zooms from z12 to z22
+                    'circle-radius': 8,
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#333',
+                    // color circles by ethnicity, using a match expression
+                    // https://docs.mapbox.com/mapbox-gl-js/style-spec/#expressions-match
+                    'circle-color': [
+                        'case',
+                        ["<=", ["get", "scan_dt"], (6)], "#f805d7",       // Pixel less than 12 hours old
+                        ["<", ["get", "scan_dt"], (12)], "#ec0606",       // Pixel more than 12 hours old
+                        ["<", ["get", "scan_dt"], (24)], "#f37e2d",       // Pixel more than 1 day old
+                        ["<", ["get", "scan_dt"], (24 * 2)], "#f5d612",
+                        ["<", ["get", "scan_dt"], (24 * 4)], "#eff5b4",
+                        /* other */ '#ccc'
+                    ]
+                }
+            });
 
 
-         map.on('click', 'goes_fire_points', function(e) {
-            var coordinates = e.features[0].geometry.coordinates.slice();
-            var description = e.features[0].properties.description;
+            map.on('click', 'goes_fire_points', function (e) {
+                var coordinates = e.features[0].geometry.coordinates.slice();
+                var description = e.features[0].properties.description;
+                var cal_fire_info = e.features[0].properties.cal_fire_info;
 
-            // Ensure that if the map is zoomed out such that multiple
-            // copies of the feature are visible, the popup appears
-            // over the copy being pointed to.
-            while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
-                coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
-            }
+                // Ensure that if the map is zoomed out such that multiple
+                // copies of the feature are visible, the popup appears
+                // over the copy being pointed to.
+                while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                    coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                }
 
-            new mapboxgl.Popup({className: "goes_fire_popup"})
-                .setLngLat(coordinates)
-                .setHTML(description)
-                .addTo(map);
+                new mapboxgl.Popup({className: "goes_fire_popup"})
+                    .setLngLat(coordinates)
+                    .setHTML(description + cal_fire_info)
+                    .addTo(map);
             });
 
             // Change the cursor to a pointer when the mouse is over the places layer.
-            map.on('mouseenter', 'goes_fire_points', function() {
-            map.getCanvas().style.cursor = 'pointer';
+            map.on('mouseenter', 'goes_fire_points', function () {
+                map.getCanvas().style.cursor = 'pointer';
             });
 
             // Change it back to a pointer when it leaves.
-            map.on('mouseleave', 'goes_fire_points', function() {
-            map.getCanvas().style.cursor = '';
-        });
-
+            map.on('mouseleave', 'goes_fire_points', function () {
+                map.getCanvas().style.cursor = '';
+            });
+        }
 
         /*
         goes_fire_pixels.features.forEach(function (feature) {
@@ -283,10 +289,8 @@ export class fireMarkers {
         }
     }
 
-     static remove_goesfire_markers(){
-        for (var i = GOES_markers.length - 1; i >=0; i --){
-            GOES_markers[i].remove()
-        }
+     static remove_goesfire_markers(map){
+        map.setLayoutProperty('goes_fire_points', 'visibility', 'none')
     }
     add_pulsing_dot(map) {
         var size = 200;
