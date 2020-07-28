@@ -232,6 +232,7 @@ class Alert(models.Model):
     dist_to_fire = models.FloatField(null=True)
     alert_time = models.DateTimeField(null=True)
     need_to_alert = models.BooleanField(null=True)
+    seen_on_website = models.BooleanField(null=True, default=False)
     cal_fire_incident_id = models.CharField(max_length=200,null=True, blank=True)
     closest_saved_location = models.CharField(max_length=200,null=True, blank=True)
 

@@ -24,12 +24,11 @@
     {% block scripts %}
     {% endblock %}
 </head>
-<body class="has-fixed-sidenav">
+<body class="no-margin">
     {% include "mysite/includes/navbar_header.html"%}
-    {% include "mysite/includes/sidebar.html"%}
+   <!-- {% include "mysite/includes/sidebar.html"%} -->
     {% include "mysite/includes/messages.html"%}
-    <div class="container">
-    <br>
+    <div class="container no-margin map">
         {% block content %}
         {% endblock %}
     </div>

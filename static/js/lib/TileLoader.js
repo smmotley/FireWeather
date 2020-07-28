@@ -264,6 +264,7 @@ const valueMap = [
 window.tileLayers = {};
 window.colormap = {}
 var imgLooper = null;
+var dateSlider = document.getElementById("timelineClock");
 
 function MBLAYER(layerOptions){
     //layerOptions is the object literal that holds all the options
@@ -287,6 +288,7 @@ function MBLAYER(layerOptions){
     this.tileSize=layerOptions.tileSize;
     this.z=layerOptions.zindex;
     this.currentValue=layerOptions.currentValue;
+    this.forecastValue=layerOptions.currentValue;
     this.defaultOptions=layerOptions.defaultOptions;
     this.autoRefresh=layerOptions.autoRefresh;
     this.sortOrder=layerOptions.sortOrder;
@@ -1294,7 +1296,8 @@ function roundDate(timeStamp, totalDays, hrInc){
 
 async function getProductTimes(product){
     const times = [];
-
+    // Times are to be loaded with the most recent time corresponding to the tile0. If the data are not a forecast
+    // then the times will decrease with each tileselt (e.g. radar0 = timeT, radar1 = timeT-deltT)
     if (product.source_id === 'radar' || product.source_id === 'swe') {
         const response = await fetch('https://mesonet.agron.iastate.edu/json/tms.json');
         const json = await response.json();
@@ -1305,7 +1308,7 @@ async function getProductTimes(product){
             var most_recent_minutes = most_recent.getMinutes()
             for(i=0; i<=50; i+=5){
                 // Time reported in milliseconds, so add i * one minute (in milliseconds) to the starting time.
-                var scanTime = most_recent.setMinutes(most_recent_minutes) + i*60000
+                var scanTime = most_recent.setMinutes(most_recent_minutes) - i*60000
                 times.push(scanTime)
             }
             tileLayers.layer[product.source_id].timestamps = times
@@ -1313,7 +1316,6 @@ async function getProductTimes(product){
         // Radar is a special case where the fileNames do not have any time info associated with them. Instead of
         // returning the timestamps in the fileNames, we need to return the fileNames themselves (needed for animation)
         return [...tileLayers.layer[product.source_id].fileTime]
-        //times.reverse();
         //times.push('900913-m50m', '900913-m45m', '900913-m40m', '900913-m35m', '900913-m30m', '900913-m25m', '900913-m20m', '900913-m15m', '900913-m10m', '900913-m05m', '900913');
     }
     if (product.source_id === 'hrrr_refl') {
@@ -1347,7 +1349,7 @@ async function getProductTimes(product){
             const datetime = (goes_obj[i]['name']).split('GOES17_')[1]
             times.push(datetime)
             }
-        times.reverse();
+        //times.reverse();
     }
     //times.reverse();
     // I have absolutely no idea why we have to do the array this way. If we just say = time (i.e. not [time])
@@ -1453,6 +1455,7 @@ export default class TileLoader{
                 // The request to load frames is coming from the slider. So only load tiles for that specific frame
                 if (frameNumber!== null){
                     i = frameNumber
+                    console.log(frameNumber)
                 }
                 const url = tileLayers.layer[product]['URL'](tileNames,i)
                 //The first image will be visible, all others will be transparent until animation starts
@@ -1464,7 +1467,7 @@ export default class TileLoader{
                         "tiles": [url],
                         "tileSize": tileLayers.layer[product].tileSize
                     });
-                    console.log("added Source: ", tileLayers.layer[product].source_id + i)
+                    console.log("added Source: ", tileLayers.layer[product].source_id + i, url)
                 }
                 catch(err){
                     //If source already exists, update the url anyway
@@ -1481,6 +1484,8 @@ export default class TileLoader{
                     },
                         firstSymbolId
                     );
+                var prettyTime = this.range_slider_times(product)
+                dateSlider.innerText = prettyTime[i]
             }
 
             if (animate===true){
@@ -1596,7 +1601,6 @@ export default class TileLoader{
         var frameCount = product_times.length;
         var frame = frameCount - 1;
         var tile_id = tileLayers.layer[product].layer_id
-        var dateSlider = document.getElementById("timelineClock");
         $('#timelineScrubber')[0].max = frameCount - 1
         dateSlider.oninput = function() {
             clearInterval(imgLooper)
@@ -1605,17 +1609,18 @@ export default class TileLoader{
             dateSlider.innerText = prettyTime[this.value]
             }
         function loop(){
-            dateSlider.innerText = prettyTime[frame]
-            $('#timelineScrubber')[0].value = frameCount - frame
             map.setPaintProperty(tile_id + frame, 'raster-opacity-transition', {duration:0, delay:0});
             map.setPaintProperty(tile_id + frame, 'raster-opacity', 0);
             frame = (frame + 1) % frameCount;
             map.setPaintProperty(tile_id + frame, 'raster-opacity', 0.7);
+            $('#timelineScrubber')[0].value = frame
+            dateSlider.innerText = prettyTime[(frameCount-1)-frame]
         }
 
     }
 
     range_slider_times(product){
+
         var product_times = tileLayers.layer[product].timestamps
         var product_time_format = tileLayers.layer[product].timeFormat
         return timeFormater(product_times, product_time_format)
@@ -1632,5 +1637,6 @@ function timeFormater(product_times, product_time_format){
         var dateString = prettyFormat(dateObj)
         pretty_times.push(dateString)
     }
+    console.log(pretty_times)
     return pretty_times
 }

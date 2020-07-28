@@ -411,12 +411,13 @@ createMap(map => {
         //               use this to take the this.value of the slider, subtract that from the max and invert the value
         //               so that any non-forecast values will allow the slider to display PAST --> PRESENT as the
         //               slider is pulled from left to right.
-        var frame = (parseInt(this.value) - parseInt(this.max)) * -1
+         var frame = (parseInt(this.value) - parseInt(this.max)) * -1
+
 
         // PRESENT --> FUTURE.
         // If this is a forecast value, any movement to the right will increase time
         if (tileLayer.forecastValue === true){
-            frame =  parseInt(this.value)
+            frame = parseInt(this.value)
         }
 
         // Find all layers on map
@@ -441,7 +442,7 @@ createMap(map => {
 
         // Update the slider with the correct time display
         var prettyTime = tileSet.range_slider_times(tile_id)
-        sliderTime.innerText = prettyTime[this.value]
+        sliderTime.innerText = prettyTime[frame]
     }
     //***********ANIMATION SLIDER END*******************
 

@@ -17,6 +17,7 @@
         <ul id="nav-mobile" class="right hide-on-med-and-down">
           <li><a href="/">Home</a></li>
           {% if user.is_authenticated %}
+              <!-- Dropdown Trigger -->
             <li><a href="/profile">{{ user.username }}</a></li>
             <li><a href="/logout">Logout</a></li>
           {% else %}
@@ -27,3 +28,9 @@
     </div>
     </nav>
 </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+    var elems = document.querySelectorAll('.dropdown-trigger');
+    var instances = M.Dropdown.init(elems);
+  });
+</script>
