@@ -604,7 +604,7 @@ def update_alertDB(loop_duration):
         if dist_to_users.exists():
             for usr in dist_to_users:
                 if pt.cal_fire_incident_id:
-                    # An previous alert with an ID, but no incident ID, means CAL Fire didn't ID it at time of alert.
+                    # A previous alert with an ID, but no incident ID, means CAL Fire didn't ID it at time of alert.
                     newCalFire = Alert.objects.filter(fire_id=pt.fire_id,
                                                       user_id=usr.user.id,
                                                       cal_fire_incident_id=None)
@@ -612,7 +612,7 @@ def update_alertDB(loop_duration):
                     # incident id AND we are deciding to alert the user again.
                     if newCalFire.exists() and pt.cal_fire_incident_id is not None:
                         newCalFire.update(cal_fire_incident_id=pt.cal_fire_incident_id,
-                                          need_to_alert=True)
+                                          need_to_alert=True, seen_on_website=False)
 
                 # New alert, but Cal Fire ID may be an actual ID or None.
                 else:

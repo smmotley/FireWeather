@@ -952,7 +952,6 @@ function addLocation(geocoder_result, pt_overRide) {
 
     new_form_data['csrfmiddlewaretoken'] = $('input[name=csrfmiddlewaretoken]').val()
     new_form_data['action'] = 'post'
-    console.log(new_form_data)
 
     $.ajax({
         type: 'POST',

@@ -17,13 +17,17 @@
     <div>
       <ul class="tabs tabs-fixed-width" id="dashboard_tabs">
         <li class="tab col s3">
-            <a href="#current_fires">Current Fires<small class="notification-badge">5</small></a></li>
+            {% if new_fire_count > 0 %}
+                <a href="#current_fires">Current Fires<small class="notification-badge" id="new_fire_badge">{{ new_fire_count }}</small></a></li>
+          {% else %}
+                <a href="#current_fires">Current Fires<small class="notification-badge" id="new_fire_badge" style="display: none">{{ new_fire_count }}</small></a></li>
+          {% endif %}
         <li class="tab col s3"><a class="active" href="#mapbox_map">Map</a></li>
         <li class="tab col s3"><a href="#forecast">Satellite</a></li>
       </ul>
     </div>
     <div id="mapbox_map">
-            {% include "mysite/includes/sidebar_test.html"%}
+        {% include "mysite/includes/sidebar_fixed_map.html"%}
         <div id="map" class="map map-big">
             <div classname="timeline" class="timeline">
                 <button title="Play/Pause Past Weather" value="paused" data-animating="nothing" id="animate">
@@ -64,7 +68,7 @@
             <table class="highlight" id="fire_table">
                 <thead>
                 <tr>
-                  <th id="table_fire_id">Viewed</th>
+                  <th id="table_viewed">Recently Alerted</th>
                   <th id="table_fire_id">Fire ID</th>
                   <th id="table_source">Source</th>
                   <th id="table_time">Time</th>
@@ -77,12 +81,15 @@
             {% for pixel in goes_template_data.features %}
                   <tr class="fire_in_table" data-fire_id="{{ pixel.properties.fire_id }}"
                   data-fire_lat="{{ pixel.properties.lat }}" data-fire_lng="{{ pixel.properties.lng }}">
-                  {%  if pixel.new_to_user  %}
-                   <td><span class="dot"></span></td>
+                  {% if pixel.properties.new_to_user == 1  %}
+                      <td style="color: #f4f4f400">{{ pixel.properties.new_to_user }}
+                        <span class="dot"></span>
+                      </td>
                   {% else %}
-                  <td>{{ pixel.new_to_user }}</td>
+                      <td style="color: #f4f4f400">{{ pixel.properties.new_to_user }}
+                        <span class="dot" style="display: none;"></span>
+                      </td>
                   {% endif %}
-
                     <td>{{ pixel.properties.fire_id }}</td>
                     <td>{{ pixel.properties.source }}</td>
                     <td>{{ pixel.properties.pretty_time }}</td>

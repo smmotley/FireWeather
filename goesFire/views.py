@@ -34,8 +34,8 @@ def fireDashboard(request):
     cal_fire_data = list(CAfire.objects.all())
     #active_CALFires = [fire for fire in cal_fire_data if fire.is_active == 'Y']
 
-    # Ignore fire points that are more than 20 days old
-    goes_fire_data = list(GoesFireTable.objects.filter(Q(scan_dt__gte=(datetime.utcnow() - timedelta(days=20)))))
+    # Ignore fire points that are more than 10 days old
+    goes_fire_data = list(GoesFireTable.objects.filter(Q(scan_dt__gte=(datetime.utcnow() - timedelta(days=10)))))
 
     # Show New Fire
     new_fires = list(Alert.objects.values_list('fire_id',flat=True).filter(user=request.user, seen_on_website=False))
@@ -100,8 +100,8 @@ def fireDashboard(request):
             cal_fire_pixel_info = f"<b><u>CalFire has ID'ed this fire:<br></u>" \
                                    f"Fire Name:</b> {cal_fire_pixel.incident_name}<br>" \
                                    f"<b>Acres Burned:</b> {cal_fire_pixel.incident_acres_burned}<br>" \
-                                   f"<b>Additional Info: <u><a href=\"{cal_fire_pixel.incident_url}\">" \
-                                    "Cal Fire Incident Page</a></u>"
+                                   f"<b>Additional Info: <u><a href=\"{cal_fire_pixel.incident_url}\" " \
+                                   f"target=\"_blank\">" "Cal Fire Incident Page</a></u>"
             source = "CAL Fire & Satellite"
         else:
             # No Cal Fire ID yet, so find an approximate fire size.
@@ -111,8 +111,10 @@ def fireDashboard(request):
             try:
                 pixels_in_group = len([px for px in goes_fire_data if px.fire_id == pixel.fire_id])
 
-                # Each pixel is 2km. 1 square km = 247.105 acres.
-                fire_size = int(2 * pixels_in_group * 247.105)
+                # Each pixel is 2km. 1 square km = 247.105 acres. However, it is highly unlikely that the
+                # fire is covering the entire pixel (off by as much as a factor of 10).
+                # Will divide by 5 to be safe.
+                fire_size = int(2 * pixels_in_group * 247.105/5)
             except ValueError as e:
                 print(f"An Error occurred when trying to est fire size {e}")
 
@@ -166,14 +168,31 @@ def fireDashboard(request):
 
     fire_image = json.dumps(fire_image)
 
+    # Reset all values for seen_on_website to True.
+    Alert.objects.filter(user=request.user).update(seen_on_website=True)
     # Note: Any item sent to javascript MUST be in json format as a string.
     return render(request=request,
                   template_name='goesFire/dashboard.html',
                   context={'mapbox_access_token': MB_TOKEN,
+                           "new_fire_count": len(new_fires),
                            "fire_data": fire_data_json,
                            "goes_image": fire_image,
                            "goes_fire_pixels": goes_fire_pixels,
                            "goes_template_data": unique_goes_feature_collection})
+
+
+@login_required(login_url='/login')
+def unreadfires(request):
+    # This is a very simple update to the database where the user will click on a fire in the "Current Fires"
+    # tab, and the fire will now register as a "viewed" fire. (Similar to the way unread mail works).
+    try:
+        if request.method == 'GET':
+            read_fire = Alert.objects.get(user=request.user, fire_id=request.GET['fire_id'])
+            read_fire.seen_on_website = True
+            read_fire.save()
+        return
+    except:
+        return
 
 
 def distance(user_lat, user_lng, pixel_lat, pixel_lng):

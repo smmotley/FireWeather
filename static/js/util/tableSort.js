@@ -1,5 +1,5 @@
 export default function sortTable(f,n){
-	var rows = $('#fire_table tbody  tr').get();
+	var rows = $('#fire_table tbody tr').get();
 
 	rows.sort(function(a, b) {
 		var A = getVal(a);
@@ -26,12 +26,18 @@ export default function sortTable(f,n){
 	});
 }
 
+var f_viewed = 1;
 var f_id = 1;
 var f_acres = 1;
 var f_dist = 1;
 var f_source = 1;
 var f_spread = 1;
 var f_time = 1;
+$("#table_viewed").click(function(){
+    f_viewed *= -1;
+    var n = $(this).prevAll().length;
+    sortTable(f_viewed,n);
+});
 $("#table_fire_id").click(function(){
     f_id *= -1;
     var n = $(this).prevAll().length;

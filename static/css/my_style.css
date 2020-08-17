@@ -38,13 +38,20 @@
 
 .sidenav.sidenav-map {
  width: 50px;
- background: #b0b8b8;
+ background: #418fd0;
  top: inherit;
  left: inherit;
+  z-index: 1001;
 
 }
 
-.notification-badge {
+.sidenav.map-layers{
+ left: 50px !important;
+ z-index: 1000;
+ top:inherit;
+}
+
+.notification-badge{
     font-family: Muli,sans-serif;
     position: relative;
     top: -12px;
@@ -58,17 +65,47 @@
 }
 
 
-
-.sidebar-maptoggle{
+.sidebar-maptoggle {
     text-transform: uppercase;
      cursor: pointer;
-    height: 64px;
-    line-height: 64px;
     float: right;
-    padding: 20px 10px 10px 10px !important;
+    padding: 20px 15px 20px 15px !important;
     transition: transform .2s;
     border-bottom: 1px solid rgba(0,0,0,0.2);
-    color: rgba(0,0,0,0.54);
+    color: rgba(255, 255, 255, 0.76);
+}
+
+.sidenav li>a>i.material-icons.sidenav-map{
+  line-height: 24px !important;
+  height: 24px !important;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.sidenav-trigger.layer-trigger{
+  line-height: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+
+}
+
+.optionsBlock{
+  padding: 10px 15px;
+  border-bottom: 1px solid #dadada;
+  border-top: 1px solid #dadada;
+  display: -webkit-box;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  line-height: 20px !important;
+}
+
+.opacity-block.range-field{
+  padding: 0 10px !important;
+}
+
+.opacity-slider{
+  padding: 8px !important;
+  float: left
 }
 
 .marker {
@@ -466,3 +503,17 @@ footer.page-footer {
     border: 0;
 }
 
+.maplayer-toggle{
+  padding: 0 10px !important;
+}
+.maplayer-toggle span{
+  display: inline-flex !important;
+}
+
+.maplayer-toggle .material-icons {
+  padding-left: 10px !important;
+}
+
+table#fire_table > thead tr th{
+  cursor: pointer;
+}

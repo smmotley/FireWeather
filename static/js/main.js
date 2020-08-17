@@ -462,10 +462,13 @@ createMap(map => {
     }
     //***********OPACITY SLIDER END*****************
 
+
+     //***********FIRE TABLE JAVASCRIPT*****************
     // Initiate the table sorting function on our current fires list
     currentFireTable
 
     $(document).ready(function () {
+
 		$(".fire_in_table").click(function () {
 			addMarkers.fireMarkers.add_goes_fire_pixels(map)
 			GOESfireToggles.checked = true
@@ -474,11 +477,38 @@ createMap(map => {
 			map_tabs.select('mapbox_map')
 			map.flyTo({
 				center: [parseFloat(this.dataset.fire_lng), parseFloat(this.dataset.fire_lat),],
-                zoom: 9,
+                zoom: 10,
 				essential: true // this animation is considered essential with respect to prefers-reduced-motion
-
 			});
+
+			// New fires since the user last viewed page (given by the {{new_fire_count}} variable in template
+			var new_fire_count = parseInt(document.getElementById("new_fire_badge").innerText)
+
+            // If the fire that the user clicked on had a visible dot, we now need to hide the dot (mark as "read")
+            // If style.display.length = 0, then it means the .dot class doesn't have a style.display attribute.
+            if (this.querySelector('.dot').style.display.length === 0){
+                this.querySelector('.dot').style.display = 'none'
+
+                // In addition to hiding the dot, we need to change the number of "new fires" in our red circle.
+                document.getElementById("new_fire_badge").innerText = (new_fire_count - 1).toString()
+
+                // If the number of fires is now 0 (all have been "read") then just hide the red badge altogether.
+                if (new_fire_count <= 1){
+                    document.getElementById("new_fire_badge").style.display = 'none'
+                }
+            }
 		});
+		// Initiate a click event from the onset of the load so that we can sort the table by time.
+        // New fires since the user last viewed page (given by the {{new_fire_count}} variable in template
+		var new_fire_count = parseInt(document.getElementById("new_fire_badge").innerText)
+        if (new_fire_count > 0){
+            var table_sort = document.getElementById('table_viewed');
+        }
+        else{
+           var table_sort = document.getElementById('table_time');
+        }
+        table_sort.click()
+
 	})
 
 });

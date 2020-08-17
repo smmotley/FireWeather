@@ -1,28 +1,38 @@
-<ul id="slide-out" class="sidenav">
- <li><a class="sidenav-close" href="#!"></li>
+<ul id="slide-out" class="sidenav map-layers">
         <li><a href="" class="logo-container">
             Fire Information<i class="material-icons left">whatshot</i></a></li>
         <li class="no-padding">
           <ul class="collapsible collapsible-accordion" style="padding: 0px">
-            <li class="bold waves-effect {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><a class="collapsible-header" tabindex="0">Pages<i class="material-icons chevron">chevron_left</i></a>
-              <div class="collapsible-body">
-                <ul>
-                  <li><a href="/pages/admin-dashboard" class="waves-effect">Dashboard<i class="material-icons">web</i></a></li>
-                  <li><a href="/pages/admin-fixed-chart" class="waves-effect">Fixed Chart<i class="material-icons">list</i></a></li>
-                  <li><a href="/pages/admin-grid" class="waves-effect">Grid<i class="material-icons">dashboard</i></a></li>
-                  <li><a href="/pages/admin-chat" class="waves-effect">Chat<i class="material-icons">chat</i></a></li>
-                </ul>
-              </div>
+            <li class="bold waves-effect {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}"><a class="collapsible-header" tabindex="0">Map Layers<i class="material-icons chevron">chevron_left</i></a>
+              {% include "goesFire/includes/map_toggles.html"%}
             </li>
-            <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Charts<i class="material-icons chevron">chevron_left</i></a>
+            <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Fire Points<i class="material-icons chevron">chevron_left</i></a>
               <div class="collapsible-body">
                 <ul>
-                  <li><a href="/pages/admin-line-charts" class="waves-effect">Line Charts<i class="material-icons">show_chart</i></a></li>
-                  <li><a href="/pages/admin-bar-charts" class="waves-effect">Bar Charts<i class="material-icons">equalizer</i></a></li>
-                  <li><a href="/pages/admin-area-charts" class="waves-effect">Area Charts<i class="material-icons">multiline_chart</i></a></li>
-                  <li><a href="/pages/admin-doughnut-charts" class="waves-effect">Doughnut Charts<i class="material-icons">pie_chart</i></a></li>
-                  <li><a href="/pages/admin-financial-charts" class="waves-effect">Financial Charts<i class="material-icons">euro_symbol</i></a></li>
-                  <li><a href="/pages/admin-interactive-charts" class="waves-effect">Interactive Charts<i class="material-icons">touch_app</i></a></li>
+                  <li class="maplayer-toggle">
+                    <label  for="PCWA_Markers">
+                        <input name="PCWA" class="filled-in makers" id="PCWA_Markers" type="checkbox"/>
+                        <span>PCWA Gauges
+                            <i class="material-icons">cloud_queue</i>
+                        </span>
+                    </label>
+                    </li>
+                    <li class="maplayer-toggle">
+                    <label  for="CALfire_Markers">
+                        <input name="CALfire_Markers" class="filled-in makers" id="CALfire_Markers" type="checkbox"/>
+                        <span>Fires: Cal Fire
+                            <i class="material-icons">cloud_queue</i>
+                        </span>
+                    </label>
+                    </li>
+                    <li class="maplayer-toggle">
+                    <label  for="GOESfire_Markers">
+                        <input name="GOES" class="filled-in makers" id="GOESfire_Markers" type="checkbox"/>
+                        <span>Fires: GOES-17
+                            <i class="material-icons">cloud_queue</i>
+                        </span>
+                    </label>
+                    </li>
                 </ul>
               </div>
             </li>
@@ -65,9 +75,6 @@
                 </ul>
               </div>
             </li>
-          <li class="bold waves-effect"><a class="collapsible-header" tabindex="0">Map Toggles<i class="material-icons chevron">chevron_left</i></a>
-              {% include "goesFire/includes/map_toggles.html"%}
-          </li>
           </ul>
         </li>
       </ul>
