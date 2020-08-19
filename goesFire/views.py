@@ -95,14 +95,23 @@ def fireDashboard(request):
         # Pixel has a CA Fire ID, so fill the popup with the appropriate HTML
         if pixel.cal_fire_incident_id:
             incident_id = pixel.cal_fire_incident_id
-            cal_fire_pixel = [fire for fire in cal_fire_data if fire.incident_id == incident_id][0]
-            fire_size = cal_fire_pixel.incident_acres_burned
-            cal_fire_pixel_info = f"<b><u>CalFire has ID'ed this fire:<br></u>" \
-                                   f"Fire Name:</b> {cal_fire_pixel.incident_name}<br>" \
-                                   f"<b>Acres Burned:</b> {cal_fire_pixel.incident_acres_burned}<br>" \
-                                   f"<b>Additional Info: <u><a href=\"{cal_fire_pixel.incident_url}\" " \
-                                   f"target=\"_blank\">" "Cal Fire Incident Page</a></u>"
-            source = "CAL Fire & Satellite"
+            # For some reason, Cal Fire may change their incident IDs. This could cause an error because the GOES
+            # database would have the old CalFire ID associated with a fire pixel.
+            try:
+                cal_fire_pixel = [fire for fire in cal_fire_data if fire.incident_id == incident_id][0]
+                fire_size = cal_fire_pixel.incident_acres_burned
+                cal_fire_pixel_info = f"<b><u>CalFire has ID'ed this fire:<br></u>" \
+                                      f"Fire Name:</b> {cal_fire_pixel.incident_name}<br>" \
+                                      f"<b>Acres Burned:</b> {cal_fire_pixel.incident_acres_burned}<br>" \
+                                      f"<b>Additional Info: <u><a href=\"{cal_fire_pixel.incident_url}\" " \
+                                      f"target=\"_blank\">" "Cal Fire Incident Page</a></u>"
+                source = "CAL Fire & Satellite"
+            except IndexError:
+                cal_fire_pixel_info = f"<b><u>CalFire has ID'ed this fire:<br></u>" \
+                                      "However, CalFire has an error with the ID of the fire<br>"
+                source = "CAL Fire & Satellite"
+                print(f"Cal Fire Id {incident_id} not found in CalFire's current database.")
+                print(IndexError)
         else:
             # No Cal Fire ID yet, so find an approximate fire size.
             #     NOTE: filtering off of the object causes a hit to the DB every time. Doing so causes a

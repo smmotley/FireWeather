@@ -9,6 +9,7 @@ import TempDisplay from "./lib/temp-display.js"
 //import pulsingDot from "./util/pulsingDot.js";
 import * as addMarkers from "./util/addMarkers.js";
 import * as currentFireTable from "./util/tableSort.js"
+import * as mapboxButtons from "./lib/mapbox_button.js";
 
 mapboxgl.accessToken = JSON.parse(document.getElementById('create-map').textContent);
 
@@ -321,6 +322,12 @@ createMap(map => {
     const tempDisplay = new TempDisplay();
     const tileSet = new TileLoader();
     let top_layer_url = undefined
+
+    // Add zoom and rotation controls to the map.
+    map.addControl(new mapboxgl.NavigationControl());
+    map.addControl(new mapboxButtons.PitchToggle({minpitchzoom: 11}));
+    map.addControl(new mapboxButtons.mapStyleToggle());
+
     layerToggles.forEach(function(elem){
             elem.addEventListener('change', () =>{
                 const isChecked = elem.checked
@@ -394,10 +401,10 @@ createMap(map => {
             }
         })
 
-
-    // **********ANIMATION SLIDER CONTROLS***************
     const dateSlider = document.getElementById("timelineScrubber");
     const sliderTime = document.getElementById("timelineClock");
+    var opacitySlider = document.getElementById('opacity_slider');
+    // **********ANIMATION SLIDER CONTROLS***************
     dateSlider.oninput = function(e) {
         // Determine which layer to change
         var tile_id = find_top_layer(map, null)
@@ -437,8 +444,13 @@ createMap(map => {
            tileSet.loadTiles(map,loader,tile_id,colorTexture.create(vMap, colorFunctionVisSat), false, frame)
         }
 
+        var visible_layer_opacity = 0.7
+            if (typeof opacitySlider.value !== 'undefined') {
+                visible_layer_opacity = parseInt(opacitySlider.value, 10) / 100
+            }
         // Set the opacity of the layer we want to view at 0.7
-        map.setPaintProperty(tile_id + '-tiles' + frame, 'raster-opacity', 0.7);
+        console.log("Animation toggle opacity: " + visible_layer_opacity)
+        map.setPaintProperty(tile_id + '-tiles' + frame, 'raster-opacity', visible_layer_opacity);
 
         // Update the slider with the correct time display
         var prettyTime = tileSet.range_slider_times(tile_id)
@@ -448,16 +460,18 @@ createMap(map => {
 
 
     //***********OPACITY SLIDER START*****************
-    var opacitySlider = document.getElementById('opacity_slider');
     opacitySlider.oninput = function() {
         var layers = map.getStyle().layers;                                         // Find all layers
         const raster_layers = layers.filter(item => item.type.includes('raster'))   // Only get layers of type raster
         for (var product_layer of raster_layers) {
-            map.setPaintProperty(
-                product_layer.id,
-                'raster-opacity',
-                parseInt(this.value, 10) / 100
-            );
+            console.log(product_layer.paint['raster-opacity'])
+                if (product_layer.paint['raster-opacity'] !== 0){
+                map.setPaintProperty(
+                    product_layer.id,
+                    'raster-opacity',
+                    parseInt(this.value, 10) / 100
+                );
+            }
         }
     }
     //***********OPACITY SLIDER END*****************

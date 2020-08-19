@@ -329,8 +329,8 @@ tileLayers.baseURL={
     NDFD_90d: (tile_names,i) =>`https://cors-anywhere.herokuapp.com/digital.weather.gov/wms.php?LAYERS=ndfd.conus.375d&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&VT=${tile_names[i]}&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
     NDFD_TOR: (tile_names,i) =>`https://cors-anywhere.herokuapp.com/digital.weather.gov/wms.php?LAYERS=ndfd.conus.ptornado&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&VT=${tile_names[i]}&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
     NDFD_HAIL: (tile_names,i) =>`https://cors-anywhere.herokuapp.com/digital.weather.gov/wms.php?LAYERS=ndfd.conus.phail&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&VT=${tile_names[i]}&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
-    //LIGHTNING: (tile_names,i) =>`https://mapservice.nohrsc.noaa.gov/arcgis/services/national_water_model/NWM_Stream_Analysis/MapServer/export?LAYERS=show:7,8,9,10,11,12&FORMAT=image/png&TRANSPARENT=TRUE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
-    LIGHTNING: (tile_names,i) =>`https://idpgis.ncep.noaa.gov/arcgis/services/NWS_Forecasts_Guidance_Warnings/watch_warn_adv/MapServer/WMSServer?LAYERS=0&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&f=image`,
+    LIGHTNING: (tile_names,i) =>`https://services.arcgis.com/BLN4oKB0N1YSgvY8/arcgis/rest/services/Power_Outages_(View)/FeatureServer/LAYERS=1&SERVICE=WMS&REQUEST=GetMap&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&f=image`,
+    //LIGHTNING: (tile_names,i) =>`https://idpgis.ncep.noaa.gov/arcgis/services/NWS_Forecasts_Guidance_Warnings/watch_warn_adv/MapServer/WMSServer?LAYERS=0&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&f=image`,
     NDFD_STORMS: (tile_names,i) =>`https://cors-anywhere.herokuapp.com/digital.weather.gov/wms.php?LAYERS=ndfd.conus.ptotsvrtstm&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&VT=${tile_names[i]}&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
     NDFD_FIRE_DRYLIGHTNING: (tile_names,i) =>`https://cors-anywhere.herokuapp.com/digital.weather.gov/wms.php?LAYERS=ndfd.conus.dryfireo&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&VT=${tile_names[i]}&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
 
@@ -1602,12 +1602,17 @@ export default class TileLoader{
         var frameCount = product_times.length;
         var frame = frameCount - 1;
         var tile_id = tileLayers.layer[product].layer_id
+        var opacitySlider = document.getElementById('opacity_slider');
         $('#timelineScrubber')[0].max = frameCount - 1
         function loop(){
+            var visible_layer_opacity = 0.7
+            if (typeof opacitySlider.value !== 'undefined') {
+                visible_layer_opacity = parseInt(opacitySlider.value, 10) / 100
+            }
             map.setPaintProperty(tile_id + frame, 'raster-opacity-transition', {duration:0, delay:0});
             map.setPaintProperty(tile_id + frame, 'raster-opacity', 0);
             frame = (frame + 1) % frameCount;
-            map.setPaintProperty(tile_id + frame, 'raster-opacity', 0.7);
+            map.setPaintProperty(tile_id + frame, 'raster-opacity', visible_layer_opacity);
             $('#timelineScrubber')[0].value = frame
             dateSlider.innerText = prettyTime[(frameCount-1)-frame]
         }
