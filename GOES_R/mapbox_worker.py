@@ -1,6 +1,7 @@
 import os
+import sys
 import django
-
+#sys.path.append("/var/www/FireWeather")
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
 django.setup()
 import matplotlib.pyplot as plt

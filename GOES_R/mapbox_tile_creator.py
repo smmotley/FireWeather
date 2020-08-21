@@ -68,8 +68,10 @@ class TileRBG:
         yres = (ymax - ymin) / float(ny)
 
         # The satellite seems to be off in the x-dir by 4 pixels and 2 pixels in the y-dir
-        x_adjustment_factor = xres * 4
-        y_adjustment_factor = yres * 2
+        #x_adjustment_factor = xres * 4
+        #y_adjustment_factor = yres * 2
+        x_adjustment_factor = xres * 0
+        y_adjustment_factor = yres * 0
         geotransform = ((xmin + x_adjustment_factor), xres, 0, (ymax - y_adjustment_factor), 0, -yres)
 
         R_band = self.R_band * 255
@@ -78,9 +80,25 @@ class TileRBG:
 
         # The file created here will be overwritten every time. The geotiff is fed into rio mbtiles.
         dst_ds = gdal.GetDriverByName('GTiff').Create('GOES17.tif', nx, ny, 3, gdal.GDT_Byte)
+        #dst_ds = gdal.Open('GOES17.tif', nx, ny, 3, gdal.GDT_Byte)
 
-        goes17_proj = f"+proj=geos +lon_0={sat_lon} +h={sat_h} +x_0=0 +y_0=0 +a={major_ax} +b={minor_ax} +units=m"
+        # FROM: https://github.com/lanceberc/GOES/blob/master/GOES_GDAL.ipynb
+        goes17_proj = f"+proj=geos -ellps=GRS80 +f=.00335281068119356027 +sweep=x +no_defs +lon_0={sat_lon} " \
+                      f"+h={sat_h} +x_0=0 +y_0=0 +a={major_ax} +b={minor_ax} +units=m +over"
 
+        proj_mercator = "+proj=merc +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +over"
+        proj_anti_mercator = "+proj=merc +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +over +lon_0=-180"
+
+        warpOptions = gdal.WarpOptions(
+            format="GTiff",
+            width=nx,
+            height=ny,
+            outputBoundsSRS="EPSG:4326",  # WGS84 - Allows use of lat/lon outputBounds
+            outputBounds=[-152.0, 30.0, -110.0, 50.0], # lat/long of ll, ur corners
+            dstSRS=proj_anti_mercator,  # GOES-17 full-disk crosses the anti-meridian
+            warpOptions=["SOURCE_EXTRA=500"],  # Magic from The Internet for off-earth pixels
+            multithread=True,  # Not sure if this buys anything on my setup
+        )
 
         dst_ds.SetGeoTransform(geotransform)                  # specify coords
         # srs.ImportFromEPSG(3857)                            # WGS84 x/y
@@ -93,16 +111,18 @@ class TileRBG:
         srs.ImportFromProj4(goes17_proj)                      # Get the projection of the GOES-17.
 
         dst_ds.SetProjection(srs.ExportToWkt())               # set the projection of our geotiff to match the GOES-17
+        gdal.Warp('GOES17_warped.tif', dst_ds, options=warpOptions)
         dst_ds.FlushCache()                                   # write to disk
         dst_ds = None                                         # clear data
 
         # Get the path name of the directory for our GEOTIF and MBTILES
         dir_path = os.path.dirname(os.path.realpath(__file__))
 
-        # rio is installed by conda and automatically installs the exe files for command lines. Need to tell python
+        # rio is installed by conda by installing "rasterio". You still need to >pip install rio-mbtiles and automatically installs the exe files for command lines. Need to tell python
         # where the path to rio exists. Using $> which rio incase the install directory changes.
         # rio_path = check_output('which rio')
         rio_path = "/opt/anaconda3/envs/django_python/bin/rio"
+        #rio_path = "/root/anaconda3/envs/django_python/bin/rio"
 
         # The path of our file created by the RGB bands above.
         input_path = os.path.join(dir_path, "GOES17.tif")
