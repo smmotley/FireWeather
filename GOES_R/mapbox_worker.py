@@ -1,12 +1,11 @@
 import os
 import sys
 import django
-#sys.path.append("/var/www/FireWeather")
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
-django.setup()
+import platform
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
 import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import cartopy.io.shapereader as shpreader
 import io
 from noaa_aws import AwsGOES
 from GOES_Image_Creator import Fire_Image
@@ -16,18 +15,28 @@ import pytz
 import sqlite3
 import boto3
 import numpy as np
-from goesFire.models import GoesImages
 from mapbox_tile_creator import TileRBG
 from pyproj import Proj
 t1 = Timeloop()
 
+rioMaxZoomResolution = '6'  # Max Zoom for tile creation (For CONUS, 8 gives max res. For MESO 10 gives max).
+if "Linux" in platform.platform(terse=True):
+    sys.path.append("/var/www/FireWeather")
+    rioMaxZoomResolution = '8'  # Max Zoom for tile creation (For CONUS, 8 gives max res. For MESO 10 gives max).
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
+django.setup()
+from goesFire.models import GoesImages
+
+
+
 # Analise only the most recent file in the S3 bucket.
 most_recent_scan = False
 save_png_to_db = True
-rioMaxZoomResolution = '6'  # Max Zoom for tile creation (For CONUS, 8 gives max res. For MESO 10 gives max).
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db.sqlite3')
 CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
 CURSOR = CONN.cursor()
+
 
 
 @t1.job(interval=timedelta(minutes=5))
@@ -134,22 +143,24 @@ def png_db(C, composite_img, DATE):
     XX, YY = np.meshgrid(x, y)
     lons, lats = p(XX, YY, inverse=True)
 
-    # Draw zoomed map
-    m = Basemap(resolution='i', projection='cyl', area_thresh=50000, llcrnrlon=-125,
-                llcrnrlat=33,
-                urcrnrlon=-113, urcrnrlat=43 )
-
     plt.figure(figsize=[15, 12])
-    # We need an array the shape of the data, so use R. The color of each pixel will be set by color=colorTuple.
-    newmap = m.pcolormesh(lons, lats, composite_img['R'], color=composite_img['rgb_composite'], linewidth=0, latlon=True)
-    newmap.set_array(None)
-
-    m.drawcountries(color='white')
-    m.drawstates(color='white')
-    m.drawcounties(color='white', linewidth=0.25)
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax.set_extent([-125, -113, 33, 43], ccrs.PlateCarree())
 
     plt.title('GOES-17 True Color', loc='left', fontweight='semibold', fontsize=15)
     plt.title('%s' % DATE.strftime('%d %B %Y %H:%M UTC '), loc='right');
+
+    # We need an array the shape of the data, so use R. The color of each pixel will be set by color=colorTuple.
+    plt.pcolormesh(lons, lats, composite_img['R'], color=composite_img['rgb_composite'],
+                   transform=ccrs.PlateCarree())
+
+    shp_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..', 'static', 'images', 'countyl010g_shp', 'countyl010g.shp'))
+
+    reader = shpreader.Reader(shp_path)
+    countiesShp = list(reader.geometries())
+    COUNTIES = cfeature.ShapelyFeature(countiesShp, ccrs.PlateCarree())
+    ax.add_feature(COUNTIES, facecolor='none', edgecolor='white', linewidth=0.25)
 
     buf = io.BytesIO()
     plt.savefig(buf, bbox_inches='tight', format='png')
@@ -246,6 +257,6 @@ def forced_loop_creator(goes_multiband, center_lnglat, bucket, s3, starting_time
 if __name__ == "__main__":
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
     main()
-
+    t1.start(block=True)
 
 

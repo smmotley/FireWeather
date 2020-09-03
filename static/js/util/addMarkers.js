@@ -179,7 +179,7 @@ export class fireMarkers {
                 'source': 'goes_fire_points',
                 'paint': {
                     // make circles larger as the user zooms from z12 to z22
-                    'circle-radius': 8,
+                    //'circle-radius': 8,
                     'circle-stroke-width': 1,
                     'circle-stroke-color': '#333',
                     // color circles by ethnicity, using a match expression
@@ -955,7 +955,7 @@ function addLocation(geocoder_result, pt_overRide) {
 
     $.ajax({
         type: 'POST',
-        url: 'change_location',
+        url: 'getSatImgs',
         data: new_form_data,
         success: function (json) {
             M.toast({html: "Location Added", classes: 'green rounded', displayLength:2000});

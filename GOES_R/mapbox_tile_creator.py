@@ -1,4 +1,4 @@
-import os
+import os, sys, platform
 from datetime import datetime
 from mapbox import Uploader
 from subprocess import call, check_output
@@ -78,15 +78,24 @@ class TileRBG:
         G_band = self.G_band * 255
         B_band = self.B_band * 255
 
+        # Get the path name of the directory for our GEOTIF and MBTILES
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        print("Your Files Are Saving Here: " + dir_path)
+
         # The file created here will be overwritten every time. The geotiff is fed into rio mbtiles.
-        dst_ds = gdal.GetDriverByName('GTiff').Create('GOES17.tif', nx, ny, 3, gdal.GDT_Byte)
+        dst_ds = gdal.GetDriverByName('GTiff').Create(os.path.join(dir_path,'GOES17.tif'), nx, ny, 3, gdal.GDT_Byte)
         #dst_ds = gdal.Open('GOES17.tif', nx, ny, 3, gdal.GDT_Byte)
 
         # FROM: https://github.com/lanceberc/GOES/blob/master/GOES_GDAL.ipynb
+        # The important part of this is to use the +over in the projection. It accounts for the fact that
+        # the image crosses -180 W
         goes17_proj = f"+proj=geos -ellps=GRS80 +f=.00335281068119356027 +sweep=x +no_defs +lon_0={sat_lon} " \
                       f"+h={sat_h} +x_0=0 +y_0=0 +a={major_ax} +b={minor_ax} +units=m +over"
 
-        proj_mercator = "+proj=merc +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +over"
+        # HUGE HELP! FROM: https://github.com/lanceberc/GOES/blob/master/GOES_GDAL.ipynb
+        # The EPSG definition of Mercator doesn't allow longitudes that extend past -180 or 180 which makes
+        # working in the Pacific difficult. Define our own centralized on the anti-meridian to make working
+        # with GOES-17 (which crosses the anti-meridian) continuous.
         proj_anti_mercator = "+proj=merc +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +over +lon_0=-180"
 
         warpOptions = gdal.WarpOptions(
@@ -111,18 +120,16 @@ class TileRBG:
         srs.ImportFromProj4(goes17_proj)                      # Get the projection of the GOES-17.
 
         dst_ds.SetProjection(srs.ExportToWkt())               # set the projection of our geotiff to match the GOES-17
-        gdal.Warp('GOES17_warped.tif', dst_ds, options=warpOptions)
+        gdal.Warp(os.path.join(dir_path,'GOES17_warped.tif'), dst_ds, options=warpOptions)
         dst_ds.FlushCache()                                   # write to disk
         dst_ds = None                                         # clear data
-
-        # Get the path name of the directory for our GEOTIF and MBTILES
-        dir_path = os.path.dirname(os.path.realpath(__file__))
 
         # rio is installed by conda by installing "rasterio". You still need to >pip install rio-mbtiles and automatically installs the exe files for command lines. Need to tell python
         # where the path to rio exists. Using $> which rio incase the install directory changes.
         # rio_path = check_output('which rio')
         rio_path = "/opt/anaconda3/envs/django_python/bin/rio"
-        #rio_path = "/root/anaconda3/envs/django_python/bin/rio"
+        if "Linux" in platform.platform(terse=True):
+            rio_path = "/var/www/django_python/bin/rio"
 
         # The path of our file created by the RGB bands above.
         input_path = os.path.join(dir_path, "GOES17.tif")

@@ -1,18 +1,21 @@
 from osgeo.gdalnumeric import *
 import django
+import platform
+import os, io, time, sys
 
+if "Linux" in platform.platform(terse=True):
+    sys.path.append("/var/www/FireWeather")
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
 django.setup()
 from pyproj import Proj, Geod, transform
 from functools import partial
 from datetime import datetime, timedelta
 import pytz
 import sqlite3
-import os, io, time, sys
 import pandas as pd
 import boto3
 import numpy as np
-import imageio
-from PIL import Image
 import shapely, shapely.ops
 from shapely.geometry import Point, MultiPoint
 import json

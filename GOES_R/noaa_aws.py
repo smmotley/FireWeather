@@ -96,6 +96,7 @@ class AwsGOES(object):
             fname = FILE.split("_")[-1]
             print("Downloading :", FILE)
             s3.Bucket(bucket).download_file(FILE, tempf)
+            #print("YOU ARE DOWNLOADING A STATIC FILE SAVED TO DISK: ")
             print("Download Successful", tempf)
             #C = nc.Dataset(tempf, 'r')
             C = xr.open_dataset(tempf)                      # Now using xarray.

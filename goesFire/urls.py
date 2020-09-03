@@ -21,6 +21,7 @@ app_name = "goesFire"
 
 urlpatterns = [
     path("dashboard", views.fireDashboard, name="dashboard"),
-    path("unreadfires", views.unreadfires, name="unreadfires")
+    path("unreadfires", views.unreadfires, name="unreadfires"),
+    path("getSatImgs", views.getSatImgs, name="getSatImgs")
     #path("", views.register, name="registration"),
 ]

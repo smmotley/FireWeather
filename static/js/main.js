@@ -10,6 +10,7 @@ import TempDisplay from "./lib/temp-display.js"
 import * as addMarkers from "./util/addMarkers.js";
 import * as currentFireTable from "./util/tableSort.js"
 import * as mapboxButtons from "./lib/mapbox_button.js";
+import satLooper from "./util/satImgLooper.js";
 
 mapboxgl.accessToken = JSON.parse(document.getElementById('create-map').textContent);
 
@@ -404,7 +405,7 @@ createMap(map => {
     const dateSlider = document.getElementById("timelineScrubber");
     const sliderTime = document.getElementById("timelineClock");
     var opacitySlider = document.getElementById('opacity_slider');
-    // **********ANIMATION SLIDER CONTROLS***************
+    // **********ANIMATION SLIDER CONTROLS FOR MAP***************
     dateSlider.oninput = function(e) {
         // Determine which layer to change
         var tile_id = find_top_layer(map, null)
@@ -522,9 +523,9 @@ createMap(map => {
            var table_sort = document.getElementById('table_time');
         }
         table_sort.click()
-
 	})
-
+    //**************END FIRE TABLE************************
+    satLooper()
 });
 
 function find_top_layer(map, elem){

@@ -204,6 +204,22 @@ def unreadfires(request):
         return
 
 
+@login_required(login_url='/login')
+def getSatImgs(request):
+    # Get the latest Goes Image.
+    sat_imgs = []
+    if request.method == 'GET':
+        goes_images = GoesImages.objects.filter(Q(scan_dt__gte=(datetime.utcnow() - timedelta(days=6))))
+        for image in goes_images:
+            if image.fire_temp_image is not None:
+                sat_imgs.append(b64encode(image.fire_temp_image).decode("utf-8"))
+            else:
+                fire_image = None
+
+    return JsonResponse({'sat_imgs':sat_imgs})
+
+
+
 def distance(user_lat, user_lng, pixel_lat, pixel_lng):
     radlat = math.radians(pixel_lat)  # given latitude
     radlong = math.radians(pixel_lng)  # given longitude

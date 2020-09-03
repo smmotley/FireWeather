@@ -23,7 +23,7 @@
                 <a href="#current_fires">Current Fires<small class="notification-badge" id="new_fire_badge" style="display: none">{{ new_fire_count }}</small></a></li>
           {% endif %}
         <li class="tab col s3"><a class="active" href="#mapbox_map">Map</a></li>
-        <li class="tab col s3"><a href="#forecast">Satellite</a></li>
+        <li class="tab col s3"><a href="#satellite">Satellite</a></li>
       </ul>
     </div>
     <div id="mapbox_map">
@@ -102,6 +102,30 @@
             {% endfor %}
         </tbody>
       </table>
+            </div>
+        </div>
+    </div>
+    <div id="satellite">
+        <div id="satImage">
+            <div classname="timeline" class="timeline">
+                <button title="Play/Pause Past Weather" value="paused" data-animating="nothing" id="animate_sat">
+                    <i class="material-icons pause_play_button sat">play_circle_outline</i>
+                    <div class="label" id="timeline_start_time_sat">Animate</div>
+                </button>
+                <div class="scrubberControl">
+                    <div id="timelineClock_sat" classname="timestamp" class="timestamp">Date</div>
+                    <div>
+                        <div classname="range-field" class="range-field">
+                            <input type="range" min="0" max="23" dir="ltr" id="timelineScrubber_sat" aria-label="rangeslider" classname="rangeSlider" value="23" class="rangeSlider" style="background-size: 98% 100%;">
+                        </div>
+                    </div>
+                </div>
+                <div class="speedControl">
+                    <button title="Change Animation Speed">
+                        <i class="material-icons">fast_forward</i>
+                        <div class="label">2x</div>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
