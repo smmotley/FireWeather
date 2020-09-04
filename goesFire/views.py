@@ -87,7 +87,11 @@ def fireDashboard(request):
             pixel_time = (pixel.scan_dt).strftime("%m/%d %H:%M")
 
         # Only one user (the user currently hitting this program), so this just get first item [0] from the query set.
-        dist_to_user = distance(user_lat, user_lng, pixel.lat, pixel.lng)
+        try:
+            dist_to_user = distance(user_lat, user_lng, pixel.lat, pixel.lng)
+        except TypeError as e:
+            print("No Location Data Stored For User", e)
+            dist_to_user = None
 
         # Populate the HTML popup window. Assume CalFire has not ID'ed this fire.
         cal_fire_pixel_info = ""

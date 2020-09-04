@@ -129,10 +129,10 @@ class TileRBG:
         # rio_path = check_output('which rio')
         rio_path = "/opt/anaconda3/envs/django_python/bin/rio"
         if "Linux" in platform.platform(terse=True):
-            rio_path = "/var/www/django_python/bin/rio"
+            rio_path = "/var/www/venv/django_python/bin/rio"
 
         # The path of our file created by the RGB bands above.
-        input_path = os.path.join(dir_path, "GOES17.tif")
+        input_path = os.path.join(dir_path, "GOES17_warped.tif")
 
         tile_source = f'GOES17_{scan_start}.mbtiles'
         tile_id = f'GOES17_{scan_start}'
