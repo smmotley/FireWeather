@@ -1,16 +1,68 @@
 {% extends "mysite/header.html" %}
 {%  load materializecss %}
 {% block content %}
-    <form method = "POST">
-        {%  csrf_token %}
-        {% for field in form %}
-            <div class="field">
-                <label for="{{ field.id_for_label }}" class="label">{{ field.label }}</label>
-                {{ field }}
+    <style>
+    body{
+        background-image: url(../../../static/images/web_images/Thunderhead.jpg);
+        background-size: cover;
+    }
+    .register{
+        margin-top: 100px;
+        width: auto;
+    }
+    .register .card{
+        background: rgba(0,0,0,0.6);
+         border-radius: 0 0 5px 5px;
+    }
+    .register .card-action{
+        background: rgba(2, 48, 114, 0.6);
+        border-radius: 5px 5px 0 0;
+    }
+    .register label{
+        font-size: 24px;
+        font-weight: bold;
+        color: #ccc
+    }
+    .register input{
+        font-size: 28px;
+        color: #ccc
+    }
+    .register li, span{
+        font-size: 16px;
+        color: #ccc
+    }
+    .register button:hover{
+        padding: 0px 40px;
+    }
+    .register .login_reg{
+        font-size: 16px;
+        font-weight: bold;
+        color: #ccc
+    }
+    </style>
+    <div class="row register">
+        <div class="col s12 offset-s3" style="width: auto">
+            <div class="card">
+                <div class="card-action white-text">
+                    <h3>Registration</h3>
+                </div>
+
+                <div class="card-content">
+                     <form method = "POST">
+                        {%  csrf_token %}
+                        {{ form.as_p }}
+                         <div class="form-field center-align">
+                            <button class="btn" style="background-color:
+                            #372be2; color:white" type="submit">REGISTER</button>
+                         </div>
+                    </form>
+                    <div class="login_reg">
+                        If you already have an account,
+                        <a href="/login"><strong>login</strong></a> instead
+                    </div>
+                </div>
             </div>
-        {% endfor %}
-        <button class="btn" style="background-color: blueviolet; color:white" type="submit">register</button>
-    </form>
-    If you already have an account, <a href="/login"><strong>login</strong></a> instead
+        </div>
+    </div>
 {% endblock %}
 

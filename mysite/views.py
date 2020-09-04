@@ -34,7 +34,7 @@ def register(request):
             # Redirect them to any page ("") will redirect them to the homepage
             # "main:homepage" goes into urls.py, looks for the app_name="main" and
             # then finds the link associated with name="homepage"
-            return redirect("mysite:homepage")
+            return redirect("goesFire:dashboard")
         else:
             for msg in form.error_messages:
                 messages.error(request, f"{msg}:{form.error_messages}")

@@ -1,10 +1,64 @@
 {% extends "mysite/header.html" %}
 
 {% block content %}
-    <form method = "POST">
-        {%  csrf_token %}
-        {{ form.as_p }}
-        <button class="btn" style="background-color: blueviolet; color:white" type="submit">login</button>
-    </form>
-    If you don't already have an account, <a href="/register"><strong>register</strong></a> for one.
+    <style>
+    body{
+        background-image: url(../../../static/images/web_images/Thunderhead.jpg);
+        background-size: cover;
+    }
+    .login{
+        margin-top: 100px;
+        width: auto;
+    }
+    .login .card{
+        background: rgba(0,0,0,0.6);
+         border-radius: 0 0 5px 5px;
+    }
+    .login .card-action{
+        background: rgba(2, 48, 114, 0.6);
+        border-radius: 5px 5px 0 0;
+    }
+    .login label{
+        font-size: 24px;
+        font-weight: bold;
+        color: #ccc
+    }
+    .login input{
+        font-size: 28px;
+        color: #ccc
+    }
+    .login button:hover{
+        padding: 0px 40px;
+    }
+    .login .register{
+        font-size: 16px;
+        font-weight: bold;
+        color: #ccc
+    }
+    </style>
+    <div class="row login">
+        <div class="col s12 offset-s5" style="width: auto">
+            <div class="card">
+                <div class="card-action white-text">
+                    <h3>Weather Portal Login</h3>
+                </div>
+
+                <div class="card-content">
+                     <form method = "POST">
+                        {%  csrf_token %}
+                        {{ form.as_p }}
+                         <div class="form-field center-align">
+                            <button class="btn" style="background-color:
+                            #372be2; color:white" type="submit">Login</button>
+                         </div>
+                    </form>
+                    <div class="register">
+                        If you don't already have an account,
+                        <a href="/register"><strong>register</strong></a> for one.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 {% endblock %}
