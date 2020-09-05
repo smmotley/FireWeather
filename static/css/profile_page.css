@@ -78,10 +78,6 @@
     clear: both
 }
 
-#map_geolocation {
-    height: 60vh;
-}
-
 .blinking {
 	animation: blinker 1.0s linear infinite;
 }

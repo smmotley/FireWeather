@@ -11,6 +11,10 @@
   margin-left: 50px; /* This moves it over for our side bar */
 }
 
+#map_geolocation{
+  height: 100%;
+}
+
 .dot {
   height: 20px;
   width: 20px;

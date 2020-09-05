@@ -20,7 +20,7 @@
     <link href='https://api.mapbox.com/mapbox-gl-js/v1.10.1/mapbox-gl.css' rel='stylesheet' />
     <script src='https://api.mapbox.com/mapbox-gl-js/v1.10.1/mapbox-gl.js'></script>
     <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js'></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     {% block scripts %}
     {% endblock %}
 </head>
@@ -28,10 +28,8 @@
     {% include "mysite/includes/navbar_header.html"%}
    <!-- {% include "mysite/includes/sidebar.html"%} -->
     {% include "mysite/includes/messages.html"%}
-    <div class="container no-margin map">
         {% block content %}
         {% endblock %}
-    </div>
 </body>
 
 <script>M.AutoInit();</script>

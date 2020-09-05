@@ -1,5 +1,6 @@
 import * as location_map from '../map.js'
 import * as addMarkers from '../util/addMarkers.js'
+import * as mapboxButtons from "../lib/mapbox_button.js";
 
 var mb_geocoder
 var geocoder_result = null  // initialize with null
@@ -21,11 +22,9 @@ function createGeoLocationMap(onLoad, mapboxgl = window.mapboxgl) {
         container: 'map_geolocation',
         style: 'mapbox://styles/mapbox/streets-v10',
         center: [-120.5, 39.05],
-        zoom: 9
+        zoom: 7
     });
 
-    map.addControl(geolocate);
-    //addMarkers.userMarkers(map)
 
     mb_geocoder = new MapboxGeocoder({
         accessToken: mapboxgl.accessToken,
@@ -34,15 +33,18 @@ function createGeoLocationMap(onLoad, mapboxgl = window.mapboxgl) {
         region: 'california',
         marker: false
         });
-
+    map.addControl(geolocate);
 
    //mb_geocoder.addTo('#geolocation_searchbar');   //This will add the geocoder to the "Your Locations" tab
     map.addControl(mb_geocoder)
+    map.addControl(new mapboxgl.NavigationControl());
+    map.addControl(new mapboxButtons.PitchToggle({minpitchzoom: 11}));
+    map.addControl(new mapboxButtons.mapStyleToggle());
+
 
 
     mb_geocoder.on('result', function(ev) {
           geocoder_result = ev.result;
-          console.log(geocoder_result)
           var styleSpecBox = document.getElementById('json-response');
           var styleSpecText = JSON.stringify(geocoder_result, null, 2);
           document.getElementById("add_point").style.visibility="visible"
