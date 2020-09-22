@@ -327,15 +327,17 @@ tileLayers.baseURL={
 
 // THIS SECTION WILL APPEND CHECKBOXES TO THE SIDEBAR_MARKER_TOGGLES.HTML SECTION.
 // ALL LAYER TYPES ARE "VECTOR" UNLESS IT'S THE VIS_SAT VECTORIZED DATA
-tileLayers.layer = {
-    "vis_sat": layer_constructor("Satellite", 'vis_sat', tileLayers.baseURL.VIS_SATELLITE, "%Y%m%d_%H%M", 'raster'),
-    "radar": layer_constructor("Radar", 'radar', tileLayers.baseURL.RADAR_COMP, "%Q", 'raster'),
-    "hrrr_refl": layer_constructor("HRRR Reflectivity", 'hrrr_refl', tileLayers.baseURL.HRRR_REFL, "%Q", 'raster'),
-    "modis_fires": layer_constructor("Modis Hotspots", 'modis_fires', tileLayers.baseURL.MODIS_FIRES, "%Q", 'raster'),
-    "swe": layer_constructor("SWE", 'swe', tileLayers.baseURL.SWE, 'raster'),
-    "ndfd_14d_temp": layer_constructor("14-Day Temp Forecast", 'ndfd_14d_temp', tileLayers.baseURL.NDFD_14D_TEMP, "%Q", 'raster'),
-    "ndfd_14d_precip": layer_constructor("14-Day Precip Forecast", 'ndfd_14d_precip', tileLayers.baseURL.NDFD_14D_PRECIP, "%Q", 'raster'),
-}
+$(document).ready(function() {
+    tileLayers.layer = {
+        "vis_sat": layer_constructor("Satellite", 'vis_sat', tileLayers.baseURL.VIS_SATELLITE, "%Y%m%d_%H%M", 'raster'),
+        "radar": layer_constructor("Radar", 'radar', tileLayers.baseURL.RADAR_COMP, "%Q", 'raster'),
+        "hrrr_refl": layer_constructor("HRRR Reflectivity", 'hrrr_refl', tileLayers.baseURL.HRRR_REFL, "%Q", 'raster'),
+        "modis_fires": layer_constructor("Modis Hotspots", 'modis_fires', tileLayers.baseURL.MODIS_FIRES, "%Q", 'raster'),
+        "swe": layer_constructor("SWE", 'swe', tileLayers.baseURL.SWE, 'raster'),
+        "ndfd_14d_temp": layer_constructor("14-Day Temp Forecast", 'ndfd_14d_temp', tileLayers.baseURL.NDFD_14D_TEMP, "%Q", 'raster'),
+        "ndfd_14d_precip": layer_constructor("14-Day Precip Forecast", 'ndfd_14d_precip', tileLayers.baseURL.NDFD_14D_PRECIP, "%Q", 'raster'),
+    }
+})
 
 function createValueMap(min, max) {
     const map = [...valueMap];
