@@ -1,7 +1,7 @@
 {% if user.is_authenticated %}
     {% load custom_extras %}
 <div class="collapsible-body">
-    <ul>
+    <ul id="Layer_Selection">
         {% for item in zip_lists %}
          <li>
          <label  for="{{ item.0 }}"}>
@@ -21,70 +21,8 @@
         <div class="optionsBlock">
             Layer Selection
         </div>
-    <li class="maplayer-toggle">
-        <label  for="vis_sat">
-            <input name="vis_sat" data-do="vis_sat" class="filled-in map-toggle" id="vis_sat" type="checkbox" />
-            <span>Satellite
-                <i class="material-icons">brightness_5</i>
-            </span>
-        </label>
-    </li>
-    <li class="maplayer-toggle">
-    <label  for="ovc-radar">
-        <input name="radar" data-do="radar" class="filled-in map-toggle" id="ovc-radar" type="checkbox" />
-        <span>Radar
-            <i class="material-icons">track_changes</i>
-        </span>
-    </label>
-    </li>
-    <li class="maplayer-toggle">
-    <label  for="SWE">
-        <input name="SWE" data-do="swe" class="filled-in map-toggle" id="SWE" type="checkbox" />
-        <span>SWE
-            <i class="material-icons">ac_unit</i>
-        </span>
-    </label>
-    </li>
-    <li class="maplayer-toggle">
-        <label  for="MaxT">
-            <input name="MaxT" data-do="ndfdMaxT" class="filled-in map-toggle" id="MaxT" type="checkbox" />
-            <span>Max Temp
-                <i class="material-icons">track_changes</i>
-            </span>
-        </label>
-    </li>
-    <li class="maplayer-toggle">
-        <label  for="lightning">
-            <input name="lightning" data-do="lightning" class="filled-in map-toggle" id="lightning" type="checkbox" />
-            <span>Lightning
-                <i class="material-icons">track_changes</i>
-            </span>
-        </label>
-    </li>
-    <li class="maplayer-toggle">
-    <label  for="CPC_14DayTemp">
-        <input name="CPC_14DayTemp" data-do="ndfd_14d_temp" class="filled-in map-toggle" id="CPC_14DayTemp"  type="checkbox" />
-        <span>14-Day Temp Forecast
-            <i class="material-icons">cloud_queue</i>
-        </span>
-    </label>
-    </li>
-    <li class="maplayer-toggle">
-    <label  for="CPC_14DayPrecip">
-        <input name="CPC_14DayPrecip" data-do="ndfd_14d_precip" class="filled-in map-toggle" id="CPC_14DayPrecip" type="checkbox" />
-        <span>14-Day Temp Precip
-            <i class="material-icons">cloud_queue</i>
-        </span>
-    </label>
-    </li>
-    <li class="maplayer-toggle">
-    <label  for="hrrr_refl">
-        <input name="hrrr" data-do="hrrr_refl" class="filled-in map-toggle" id="hrrr_refl" type="checkbox" />
-        <span>HRRR Reflectivity
-            <i class="material-icons">cloud_queue</i>
-        </span>
-    </label>
-    </li>
+    {# <!-- Appending to this section via TileLoader / layer_constructor.js --> #}
     </ul>
 </div>
 {% endif %}
+

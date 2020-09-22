@@ -1,6 +1,7 @@
 import * as colorTexture from "./color-texture.js";
 import * as tilebelt from "./grid/tilebelt.js";
 import ProgressPromise from "./Progress_Promise.js"
+import layer_constructor from "../util/layer_constructor.js";
 
 const VALUE_RANGE = [0, 255];
 const valueMap = [
@@ -266,40 +267,6 @@ window.colormap = {}
 var imgLooper = null;
 var dateSlider = document.getElementById("timelineClock");
 
-function MBLAYER(layerOptions){
-    //layerOptions is the object literal that holds all the options
-    const fileTime = (layerOptions.fileTime) ? layerOptions.fileTime : null;
-    const nowCoastLayerNum = (layerOptions.nowCoastLayerNum) ? layerOptions.nowCoastLayerNum : null;
-    this.source_type=layerOptions.source_type;
-    this.URL=layerOptions.URL;
-    this.ndfd_name = layerOptions.ndfd_name;
-    this.nowCoastLayerNum = nowCoastLayerNum;
-    this.fileTime = fileTime;
-    this.source_id=layerOptions.source_id;
-    this.modelRes=layerOptions.modelRes;
-    this.hour_range=layerOptions.hour_range;
-    this.hour_interval=layerOptions.hour_interval;
-    this.timestamps=layerOptions.timestamps;
-    this.timeFormat=layerOptions.timeFormat
-    this.ssecID=layerOptions.ssecID;
-    this.layer_id=layerOptions.layer_id;
-    this.paint=layerOptions.paint;
-    this.layerType=layerOptions.layerType;
-    this.tileSize=layerOptions.tileSize;
-    this.z=layerOptions.zindex;
-    this.currentValue=layerOptions.currentValue;
-    this.forecastValue=layerOptions.currentValue;
-    this.defaultOptions=layerOptions.defaultOptions;
-    this.autoRefresh=layerOptions.autoRefresh;
-    this.sortOrder=layerOptions.sortOrder;
-    this.defaultOpacity=layerOptions.defaultOpacity;
-    this.overlay=[];
-    this.title=layerOptions.title||"";
-    this.refreshMinutes=layerOptions.refreshMinutes;
-    this.safeOpacity=this.defaultOpacity;
-
-}
-
 tileLayers.baseURL={
     RADAR_COMP: (tile_names,i) => `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-${tile_names[i]}/{z}/{x}/{y}.png`,
     HRRR_REFL: (tile_names,i) => `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/hrrr::REFD-F${tile_names[i]}-0/{z}/{x}/{y}.png`,
@@ -333,7 +300,7 @@ tileLayers.baseURL={
     //LIGHTNING: (tile_names,i) =>`https://idpgis.ncep.noaa.gov/arcgis/services/NWS_Forecasts_Guidance_Warnings/watch_warn_adv/MapServer/WMSServer?LAYERS=0&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&f=image`,
     NDFD_STORMS: (tile_names,i) =>`https://cors-anywhere.herokuapp.com/digital.weather.gov/wms.php?LAYERS=ndfd.conus.ptotsvrtstm&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&VT=${tile_names[i]}&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
     NDFD_FIRE_DRYLIGHTNING: (tile_names,i) =>`https://cors-anywhere.herokuapp.com/digital.weather.gov/wms.php?LAYERS=ndfd.conus.dryfireo&FORMAT=image/png&TRANSPARENT=TRUE&VERSION=1.3.0&VT=${tile_names[i]}&EXCEPTIONS=INIMAGE&SERVICE=WMS&REQUEST=GetMap&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`,
-
+    MODIS_FIRES: (tile_names,i) => `https://firms.modaps.eosdis.nasa.gov/wms/key/87c632537b483724aa75fc7550f1d34a/?REQUEST=GetMap&layers=fires_viirs_24,fires_modis_24&WIDTH=256&HEIGHT=256&symbols=cross,circle&colors=240+40+40,250+200+50&size=8,8&BBOX={bbox-epsg-3857}&SRS=EPSG:3857`,
 
 
     //NDFD_MIN_TEMP: "http://nowcoast.noaa.gov/arcgis/rest/services/nowcoast/forecast_meteoceanhydro_sfc_ndfd_time/MapServer/export?&bbox={{minlon}},{{minlat}},{{maxlon}},{{maxlat}}&format=png&transparent=true&bgcolor=0xCCCCFE&SRS=EPSG:3857&size={{width}}%2C{{height}}&bboxSR=3857&IMAGESR=3857&f=image&layers={{layer}}&time={{time}}",
@@ -342,6 +309,7 @@ tileLayers.baseURL={
     /*RADAR_STATIC:"http://radblast.wunderground.com/cgi-bin/radar/WUNIDS_composite?maxlat={{maxlat}}&maxlon={{maxlon}}&minlat={{minlat}}&minlon={{minlon}}&width={{width}}&height={{height}}&type=00Q&frame=0&num=1&delay=25&png=0&min=0&rainsnow=1&nodebug=0&theext=.gif&timelabel=0&timelabel.x=200&timelabel.y=12&brand=wundermap&smooth=1&radar_bitmap=1&noclutter=1&noclutter_mask=1&cors=1",*/
     //RADAR_ANIMATED:"http://radblast.wunderground.com/cgi-bin/radar/WUNIDS_composite?maxlat={{maxlat}}&maxlon={{maxlon}}&minlat={{minlat}}&minlon={{minlon}}&type=N0R&frame=0&num=7&delay=25&width={{width}}&height={{height}}&png=0&smooth=1&min=0&noclutter=1&rainsnow=1&nodebug=0&theext=.gif&merge=elev&reproj.automerc=1&timelabel=1&timelabel.x=200&timelabel.y=12&brand=wundermap",
     VIS_SATELLITE: (tile_names,i) => `https://a.tiles.mapbox.com/v4/smotley.GOES17_${tile_names[i]}/{z}/{x}/{y}.png?access_token=pk.eyJ1Ijoic21vdGxleSIsImEiOiJuZUVuMnBBIn0.xce7KmFLzFd9PZay3DjvAA`,
+    VIS_SATELLITE_VECTOR: (tile_names,i) => `mapbox://smotley.GOES17_${tile_names[i]}`,
     //VIS_SATELLITE: (tile_names,i) => `https://re-c.ssec.wisc.edu/api/image?products=G17-ABI-CONUS-BAND02_${tile_names[0]}_${tile_names[1]}&z={z}&x={x}&y={y}`,
     //VIS_SATELLITE: (tile_names,i) => `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/goes-west-vis-1km-900913/{z}/{x}/{y}.png`
     HRRR_SMOKE: (tile_names,i) => `https://re-c.ssec.wisc.edu/api/image?products=HRRR-smoke-surface_${tile_names[0]}_${tile_names[1]}&z={z}&x={x}&y={y}&accesskey=dd10b55a50f0f392700587fc3090368d`,
@@ -357,873 +325,17 @@ tileLayers.baseURL={
 
 };
 
-tileLayers.layer={
-    "vis_sat":new MBLAYER({
-        source_type: 'ssec',
-        source_id:"vis_sat",
-        layer_id:'vis_sat-tiles',
-        ssecID: 'G17-ABI-CONUS-BAND02',
-        URL:tileLayers.baseURL.VIS_SATELLITE,
-        timestamps: null,
-        timeFormat: "%Y%m%d_%H%M",
-        //layerType: 'data-driven-raster',
-        layerType: "raster",
-        tileSize: 256,
-        modelRes: 2000,
-        //paint: (texture) => ({'raster-lookup-texture': texture}),
-        paint: () => ({
-            'raster-opacity': 0.5,
-                'raster-opacity-transition': {
-                'duration': 0
-            }
-        }),
-        currentValue:false,
-        forecastValue:false,
-        zindex:5,
-        defaultOptions:null,
-        defaultOpacity:50,
-        /*safeOpacity:50,*/
-        autoRefresh:true,
-        refreshMinutes:5,
-        sortOrder:95,
-        title:""
-    }),
-    /*"NWS Alerts":new wwLayer({name:"NWS Alerts",id:"chkNWSWarnings",layerType:"wms",url:weatherWatcher.templates.NWS_WARNINGS,zindex:80,currentValue:false,
-forecastValue:true,defaultOptions:null,defaultOpacity:30,autoRefresh:true,refreshMinutes:5,sortOrder:95,title:"Long term and short term weather warnings from NWS (experimental)"}),*/
-
-    "radar":new MBLAYER({
-        source_type: 'iws',
-        source_id:"radar",
-        layer_id:"radar-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-                'raster-opacity-transition': {
-                'duration': 0
-            }
-        }),
-        URL:tileLayers.baseURL.RADAR_COMP,
-        timestamps: null,
-        fileTime: ['900913', '900913-m05m', '900913-m10m', '900913-m15m', '900913-m20m', '900913-m25m', '900913-m30m', '900913-m35m', '900913-m40m', '900913-m45m', '900913-m50m'],
-        timeFormat: "%Q",       // milleseconds since epoch
-        zindex:6,
-        currentValue:false,
-        forecastValue:false,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Standard current radar (source: wunderground.com)"}),
-
-    "hrrr_refl":new MBLAYER({
-        source_type: 'iws',
-        source_id:"hrrr_refl",
-        layer_id:"hrrr_refl-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-fade-duration': 0
-
-        }),
-        URL:tileLayers.baseURL.HRRR_REFL,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Standard current radar (source: wunderground.com)"}),
-
-    "hrrr_smoke":new MBLAYER({
-        source_type: 'iws',
-        source_id:"hrrr_smoke",
-        layer_id:"hrrr_smoke-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            }
-        }),
-        URL:tileLayers.baseURL.HRRR_SMOKE,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Standard current radar (source: wunderground.com)"}),
-
-    "swe":new MBLAYER({
-        source_type: 'idpgis',
-        source_id:"swe",
-        layer_id:"swe-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            }
-        }),
-        URL:tileLayers.baseURL.SWE,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:false,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Standard current radar (source: wunderground.com)"}),
-
-    "ndfdMaxT":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfdMaxT",
-        ndfd_name: 'maxt',
-        layer_id:"ndfdMaxT-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_MAX_TEMP,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfdMinT":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfdMinT",
-        ndfd_name: 'mint',
-        layer_id:"ndfdMinT-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_MIN_TEMP,
-        hour_interval: 24,
-        hour_range: 154,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_pop":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_pop",
-        ndfd_name: 'pop',
-        layer_id:"ndfd_pop-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_POP,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_qpf":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_qpf",
-        ndfd_name: 'qpf',
-        layer_id:"ndfd_qpf-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_QPF,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_sky":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_sky",
-        ndfd_name: 'sky',
-        layer_id:"ndfd_sky-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_SKY,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_wx":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_wx",
-        ndfd_name: 'wx',
-        layer_id:"ndfd_wx-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_WX,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_temp":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_temp",
-        ndfd_name: 'temp',
-        layer_id:"ndfd_temp-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_TEMP,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_dewpt":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_dewpt",
-        ndfd_name: 'dewpt',
-        layer_id:"ndfd_dewpt-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_DEWPT,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_wdir":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_wdir",
-        ndfd_name: 'wdir',
-        layer_id:"ndfd_wdir-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_WDIR,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_snow":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_snow",
-        ndfd_name: 'snow',
-        layer_id:"ndfd_snow-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_SNOW,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_wspd":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_wspd",
-        ndfd_name: 'wspd',
-        layer_id:"ndfd_ws-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_WSPD,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_waveh":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_waveh",
-        ndfd_name: 'snow',
-        layer_id:"ndfd_waveh-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_WAVEH,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_wgust":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_wgust",
-        ndfd_name: 'wgust',
-        layer_id:"ndfd_wgust-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_WGUST,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_MAXRH":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_maxrh",
-        ndfd_name: 'maxrh',
-        layer_id:"ndfd_maxrh-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_MAXRH,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_minrh":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_minrh",
-        ndfd_name: 'minrh',
-        layer_id:"ndfd_minrh-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_MINRH,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_snowlevel":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_snowlevel",
-        ndfd_name: 'snow',
-        layer_id:"ndfd_snowlevel-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_SNOWLEVEL,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_30d":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_30d",
-        ndfd_name: '45d',
-        layer_id:"ndfd_30d-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_30d,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_14d_temp":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_14d_temp",
-        ndfd_name: '14d_temp',
-        layer_id:"ndfd_14d_temp-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_14D_TEMP,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_14d_precip":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_14d_precip",
-        ndfd_name: '14d_precip',
-        layer_id:"ndfd_14d_precip-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_14D_PRECIP,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_90d":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_90d",
-        ndfd_name: '375d',
-        layer_id:"ndfd_14d-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_90d,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_tor":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_tor",
-        ndfd_name: 'ptornado',
-        layer_id:"ndfd_ptornado-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_TOR,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_hail":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_hail",
-        ndfd_name: 'phail',
-        layer_id:"ndfd_hail-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_HAIL,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_dmgwinds":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_dmgwinds",
-        ndfd_name: 'ptstmwinds',
-        layer_id:"ndfd_dmgwinds-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_DMGWINDS,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "lightning":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"lightning",
-        ndfd_name: 'ptotsrvtstm',
-        layer_id:"lightning-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.LIGHTNING,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-        zindex:6,
-        currentValue:false,
-        forecastValue:false,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"}),
-
-    "ndfd_drylightning":new MBLAYER({
-        source_type: 'ndfd',
-        source_id:"ndfd_drylightning",
-        ndfd_name: 'dryfireo',
-        layer_id:"ndfd_drylightning-tiles",
-        layerType:"raster",
-        tileSize: 256,
-        modelRes: 2500,
-        paint: () => ({
-            'raster-opacity': 0.5,
-            'raster-opacity-transition': {
-                'duration': 0
-            },
-        }),
-        URL:tileLayers.baseURL.NDFD_FIRE_DRYLIGHTNING,
-        hour_interval: 24,
-        hour_range: 168,
-        timestamps: null,
-zindex:6,
-        currentValue:false,
-forecastValue:true,
-        defaultOptions:null,
-        defaultOpacity:60,
-        safeOpacity:60,
-        autoRefresh:true,
-        refreshMinutes:2,
-        sortOrder:10,
-        title:"Max Temp (source: weather.gov)"})
-
-
-
-};
+// THIS SECTION WILL APPEND CHECKBOXES TO THE SIDEBAR_MARKER_TOGGLES.HTML SECTION.
+// ALL LAYER TYPES ARE "VECTOR" UNLESS IT'S THE VIS_SAT VECTORIZED DATA
+tileLayers.layer = {
+    "vis_sat": layer_constructor("Satellite", 'vis_sat', tileLayers.baseURL.VIS_SATELLITE, "%Y%m%d_%H%M", 'raster'),
+    "radar": layer_constructor("Radar", 'radar', tileLayers.baseURL.RADAR_COMP, "%Q", 'raster'),
+    "hrrr_refl": layer_constructor("HRRR Reflectivity", 'hrrr_refl', tileLayers.baseURL.HRRR_REFL, "%Q", 'raster'),
+    "modis_fires": layer_constructor("Modis Hotspots", 'modis_fires', tileLayers.baseURL.MODIS_FIRES, "%Q", 'raster'),
+    "swe": layer_constructor("SWE", 'swe', tileLayers.baseURL.SWE, 'raster'),
+    "ndfd_14d_temp": layer_constructor("14-Day Temp Forecast", 'ndfd_14d_temp', tileLayers.baseURL.NDFD_14D_TEMP, "%Q", 'raster'),
+    "ndfd_14d_precip": layer_constructor("14-Day Precip Forecast", 'ndfd_14d_precip', tileLayers.baseURL.NDFD_14D_PRECIP, "%Q", 'raster'),
+}
 
 function createValueMap(min, max) {
     const map = [...valueMap];
@@ -1300,6 +412,7 @@ async function getProductTimes(product){
     // Times are to be loaded with the most recent time corresponding to the tile0. If the data are not a forecast
     // then the times will decrease with each tileselt (e.g. radar0 = timeT, radar1 = timeT-deltT)
     if (product.source_id === 'radar' || product.source_id === 'swe') {
+        tileLayers.layer[product.source_id].fileTime = ['900913', '900913-m05m', '900913-m10m', '900913-m15m', '900913-m20m', '900913-m25m', '900913-m30m', '900913-m35m', '900913-m40m', '900913-m45m', '900913-m50m']
         const response = await fetch('https://mesonet.agron.iastate.edu/json/tms.json');
         const json = await response.json();
         const radar_info = json['services'].filter(item => item.id.includes('ridge_uscomp'))
@@ -1320,14 +433,14 @@ async function getProductTimes(product){
         //times.push('900913-m50m', '900913-m45m', '900913-m40m', '900913-m35m', '900913-m30m', '900913-m25m', '900913-m20m', '900913-m15m', '900913-m10m', '900913-m05m', '900913');
     }
     if (product.source_id === 'hrrr_refl') {
-        //HRRR goes out 18 hrs (18*15*4=1080)
+        //HRRR goe out 18 hrs (18*15*4=1080)
         for (var i = 0; i < (1080); i += 15) {
             var padTime = ("000" + i).slice(-4)
             times.push(padTime)
         }
         //return times
     }
-    if (product.source_type === 'ndfd') {
+    if (product.sourceType === 'ndfd') {
         const localt = new Date()
         const utcDate = new Date(localt.getTime() + localt.getTimezoneOffset() * 60000);
         utcDate.setHours(0)
@@ -1342,7 +455,6 @@ async function getProductTimes(product){
         //return times
     }
     if (product.source_id === 'vis_sat') {
-        var productID = product.ssecID;
         const response = await fetch('https://api.mapbox.com/tilesets/v1/smotley?access_token=sk.eyJ1Ijoic21vdGxleSIsImEiOiJja2NjYnZ4Z3AwMzZ2MnJwcWV0dmxrcDQzIn0.qheNdC3aHpFz1T1uPTKKug');
         const json = await response.json();
         const goes_obj = json.filter(item => item.name.includes('GOES17_'))
@@ -1359,8 +471,6 @@ async function getProductTimes(product){
     //tileLayers.layer[product.source_id].timestamps = []
     tileLayers.layer[product.source_id].timestamps = times
     //tileLayers.layer[product.source_id].timestamps = [].concat.apply([], tileLayers.layer[product.source_id].timestamps)
-
-
     return product.timestamps;
 }
 
@@ -1414,7 +524,6 @@ export default class TileLoader{
      *   sampled from the grid
      */
     loadTiles(map,loader,product,texture, animate, frameNumber=null) {
-
         // Use this to find the top layer so that we can put highways and stuff above any layer:
         // see: https://docs.mapbox.com/mapbox-gl-js/example/geojson-layer-in-stack/ for more
         var layers = map.getStyle().layers;
@@ -1464,11 +573,11 @@ export default class TileLoader{
                 try{
                     //map.getSource(tileLayers.layer[product].source_id + i)
                     map.addSource(tileLayers.layer[product].source_id + i, {
-                        "type": tileLayers.layer[product].layerType,
+                        "type": tileLayers.layer[product].sourceType,               // e.g "raster", "vector"
                         "tiles": [url],
-                        "tileSize": tileLayers.layer[product].tileSize
+                        "tileSize": tileLayers.layer[product].tileSize              // rasters are 256, vectors 512
                     });
-                    console.log("added Source: ", tileLayers.layer[product].source_id + i, url)
+                    console.log("added Source: ", tileLayers.layer[product].source_id + i, tileLayers.layer[product], url)
                 }
                 catch(err){
                     //If source already exists, update the url anyway
@@ -1480,8 +589,9 @@ export default class TileLoader{
                         "type": tileLayers.layer[product].layerType,
                         "paint": tileLayers.layer[product].paint(texture),
                         "source": tileLayers.layer[product].source_id + i,
+                        "source-layer": tileLayers.layer[product].sourceLayer,
                         "minzoom": 0,
-                        "maxzoom": 22
+                        "maxzoom": tileLayers.layer[product].maxzoom
                     },
                         firstSymbolId
                     );
@@ -1493,7 +603,7 @@ export default class TileLoader{
                 this.animateTiles(map, product, tileNames.length, true)
             }
         })
-        if (tileLayers.layer[product].source_type === 'ndfd'){
+        if (tileLayers.layer[product].sourceType === 'ndfd'){
             getNDFDcolormap(tileLayers.layer[product].ndfd_name).then(colorkey => {
                 colormap = colorkey
             })
@@ -1609,6 +719,7 @@ export default class TileLoader{
             if (typeof opacitySlider.value !== 'undefined') {
                 visible_layer_opacity = parseInt(opacitySlider.value, 10) / 100
             }
+            //If this were a polygon, we'd use "fill-opacity" instead of "raster-opacity'
             map.setPaintProperty(tile_id + frame, 'raster-opacity-transition', {duration:0, delay:0});
             map.setPaintProperty(tile_id + frame, 'raster-opacity', 0);
             frame = (frame + 1) % frameCount;

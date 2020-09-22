@@ -92,14 +92,15 @@ class AwsGOES(object):
     def download_file(self, FILE, bucket, s3):
         try:
             tempf = tempfile.NamedTemporaryFile().name  # Creates temporary file that is automatically deleted on close
+            #tempf = os.path.join("/Users/motley/Documents/PycharmProjects/PlayGround/Polygonize/GOES17_Multiband", "OR_9.nc")
             #tempf = os.path.join("/Users/motley/Documents/PycharmProjects/PlayGround/FireWeather", "GOES17_NOW.nc")
             fname = FILE.split("_")[-1]
             print("Downloading :", FILE)
             s3.Bucket(bucket).download_file(FILE, tempf)
             #print("YOU ARE DOWNLOADING A STATIC FILE SAVED TO DISK: ")
             print("Download Successful", tempf)
-            #C = nc.Dataset(tempf, 'r')
             C = xr.open_dataset(tempf)                      # Now using xarray.
+            os.remove(tempf)                                # delete file
             return C
         except Exception as e:
             print("Can't open file:", tempf)

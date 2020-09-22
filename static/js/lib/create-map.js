@@ -12,7 +12,7 @@ export default function(onLoad, mapboxgl = window.mapboxgl, options) {
     const map = new mapboxgl.Map({
         container: 'map',
         style: 'mapbox://styles/mapbox/light-v9',
-        zoom: 4,
+        zoom: 6,
         center: [-90.5447, 32.6892]
     });
 

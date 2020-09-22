@@ -33,6 +33,8 @@ from goesFire.models import GoesImages
 # Analise only the most recent file in the S3 bucket.
 most_recent_scan = False
 save_png_to_db = True
+# mbtileFormat = 'polygon'
+mbtileFormat = 'raster'
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'db.sqlite3')
 CONN = sqlite3.connect(DB_PATH, check_same_thread=False)
 CURSOR = CONN.cursor()
@@ -111,7 +113,8 @@ def main():
                         R_band=RGB_bands['R_band'],
                         B_band=RGB_bands['B_band'],
                         G_band=RGB_bands['G_band'],
-                        maxZoom=rioMaxZoomResolution).CreateTiles
+                        maxZoom=rioMaxZoomResolution,
+                        mbtileFormat=mbtileFormat).CreateTiles
 
         png_blob = None
         if save_png_to_db:
@@ -164,6 +167,8 @@ def png_db(C, composite_img, DATE):
 
     buf = io.BytesIO()
     plt.savefig(buf, bbox_inches='tight', format='png')
+    #plt.savefig('testout.png', bbox_inches='tight', format='png')
+    #plt.show()
     buf.seek(0)
 
     ablob = buf.getvalue()

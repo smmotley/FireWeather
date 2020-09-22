@@ -332,6 +332,7 @@ createMap(map => {
     layerToggles.forEach(function(elem){
             elem.addEventListener('change', () =>{
                 const isChecked = elem.checked
+                console.log(elem)
                 if (!isChecked) {
                     animateButton[0].setAttribute('data-animating', 'nothing')
                     tileSet.removeTiles(map,elem.dataset.do)
@@ -440,9 +441,12 @@ createMap(map => {
         }
 
         // Is the layer we want to display already loaded? If not, load it.
-        const found = layers.some(el => el.id === tile_id + '-tiles' + frame)
-        if (found === false){
-           tileSet.loadTiles(map,loader,tile_id,colorTexture.create(vMap, colorFunctionVisSat), false, frame)
+        const result = async() => {
+            const found = layers.some(el => el.id === tile_id + '-tiles' + frame)
+            if (found === false){
+                const load_tileset = await tileSet
+                .loadTiles(map,loader,tile_id,colorTexture.create(vMap, colorFunctionVisSat), false, frame)
+            }
         }
 
         var visible_layer_opacity = 0.7
@@ -532,6 +536,7 @@ function find_top_layer(map, elem){
     // Only animate the top most layer (the layer that was added last)
     var layers = map.getStyle().layers;                             // Find all layers
     const raster_layers = layers
+        //.filter(item => item.type.includes('raster') || item.id.includes("vis_sat"))               // Only get layers of type raster
         .filter(item => item.type.includes('raster'))               // Only get layers of type raster
     const top_raster = raster_layers.slice(-1)[0]                   // Top raster is last in list
     // Check to make sure the user has actually added a raster to the map. If not, alert user.

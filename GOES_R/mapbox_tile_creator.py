@@ -10,15 +10,19 @@ from pyproj import Proj
 from osgeo import gdal
 from osgeo import osr
 import numpy as np
+import rasterio
+from rasterio import features, crs
+import fiona
 
 
 class TileRBG:
-    def __init__(self, C, R_band, G_band, B_band, maxZoom):
+    def __init__(self, C, R_band, G_band, B_band, maxZoom, mbtileFormat):
         self.data = C
         self.R_band = R_band
         self.G_band = G_band
         self.B_band = B_band
         self.tileMaxZoom = maxZoom
+        self.mbtileFormat = mbtileFormat
         self.mb_access_token = os.environ['MAPBOX_UPLOADER_TOKEN']
         self.CreateTiles = self.GOES17_Tile_Creation()
 
@@ -90,13 +94,14 @@ class TileRBG:
         # The important part of this is to use the +over in the projection. It accounts for the fact that
         # the image crosses -180 W
         goes17_proj = f"+proj=geos -ellps=GRS80 +f=.00335281068119356027 +sweep=x +no_defs +lon_0={sat_lon} " \
-                      f"+h={sat_h} +x_0=0 +y_0=0 +a={major_ax} +b={minor_ax} +units=m +over"
+                      f"+h={sat_h} +x_0=0 +y_0=0 +a={major_ax} +b={minor_ax} +units=m +over +lon_wrap=-180"
 
         # HUGE HELP! FROM: https://github.com/lanceberc/GOES/blob/master/GOES_GDAL.ipynb
         # The EPSG definition of Mercator doesn't allow longitudes that extend past -180 or 180 which makes
         # working in the Pacific difficult. Define our own centralized on the anti-meridian to make working
         # with GOES-17 (which crosses the anti-meridian) continuous.
-        proj_anti_mercator = "+proj=merc +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +over +lon_0=-180"
+        #proj_anti_mercator = "+proj=merc +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +over +lon_0=-180"
+        proj_anti_mercator = "+proj=merc +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +over +lon_0=0 +lon_wrap=-180"
 
         warpOptions = gdal.WarpOptions(
             format="GTiff",
@@ -104,7 +109,7 @@ class TileRBG:
             height=ny,
             outputBoundsSRS="EPSG:4326",  # WGS84 - Allows use of lat/lon outputBounds
             outputBounds=[-152.0, 30.0, -110.0, 50.0], # lat/long of ll, ur corners
-            dstSRS=proj_anti_mercator,  # GOES-17 full-disk crosses the anti-meridian
+            dstSRS="EPSG:4326",  # GOES-17 full-disk crosses the anti-meridian
             warpOptions=["SOURCE_EXTRA=500"],  # Magic from The Internet for off-earth pixels
             multithread=True,  # Not sure if this buys anything on my setup
         )
@@ -136,7 +141,18 @@ class TileRBG:
 
         tile_source = f'GOES17_{scan_start}.mbtiles'
         tile_id = f'GOES17_{scan_start}'
-        call([rio_path, 'mbtiles', '--format', 'PNG', '--overwrite', '--zoom-levels', f'1..{self.tileMaxZoom}', input_path, tile_source])
+
+        # If user wants raster tiles, then use rio to create the mbtiles.
+        if self.mbtileFormat != 'polygon':
+            call([rio_path, 'mbtiles', '--format', 'PNG', '--overwrite', '--zoom-levels', f'1..{self.tileMaxZoom}', input_path, tile_source])
+
+        # If the user wants vector tiles, then use rasterio and fiona to create the geojson, then use
+        # tippecanoe to create the vector tiles from the geojson
+        else:
+            polygonize(input_path)
+            json_source = os.path.join(dir_path, "GOES17_Poly.json")
+
+            call(['tippecanoe', '--force', '-l', 'goes17_fire', '--coalesce', '-P', '-D9', '-z6', '--grid-low-zooms', '-o', tile_source, json_source])
         uploader = Uploader(access_token=self.mb_access_token)
         tile_list = requests.get(f'https://api.mapbox.com/tilesets/v1/smotley?access_token={self.mb_access_token}')
         tile_list = json.loads(tile_list.text)
@@ -164,3 +180,32 @@ def delete_tilesets(tile_list, mb_access_token):
         if tile_time < (datetime.now(pytz.utc) - timedelta(hours=6)):
             print("DELETING TILESET: "+tile_set['id'])
             d = requests.delete(f"https://api.mapbox.com/tilesets/v1/{tile_set['id']}?access_token={mb_access_token}")
+
+
+def polygonize(input_path):
+    with rasterio.open(input_path, mode='r+') as src:
+        print("Polygonizing GeoTIFF")
+        # from https://stackoverflow.com/questions/17615963/standard-rgb-to-grayscale-conversion
+        r = src.read(1)
+        g = src.read(2)
+        b = src.read(3)
+
+        rgb = (r * 256 ** 2) + g * 256 + b
+        rgb = rgb.astype('float32')
+
+        # Make a mask
+        # mask = grayscale != 1
+        # iterate over shapes.
+        results = (
+            {'properties': {'raster_val': v}, 'geometry': s}
+            for i, (s, v) in enumerate(features.shapes(rgb, transform=src.transform)))
+        with fiona.open(
+                'GOES17_Poly'
+                '.json', 'w',
+                driver='GeoJSON',
+                crs=src.crs.wkt,
+                schema={'properties': [('raster_val', 'int')],
+                        'geometry': 'Polygon'}) as dst:
+            dst.writerecords(results)
+        print("Successfully polygonized GeoTIFF to JSON")
+        return

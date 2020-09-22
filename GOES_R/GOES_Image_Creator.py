@@ -1,4 +1,5 @@
 import numpy as np
+import platform
 
 class Fire_Image:
     def __init__(self, fileName, C):
@@ -204,6 +205,9 @@ class Fire_Image:
         # Don't use the last column of the RGB array or else the image will be scrambled!
         # This is the strange nature of pcolormesh.
         composite_rgb = composite_RGB[:, :-1, :]
+        if "Linux" in platform.platform(terse=True):
+            # For some reason, the pcolormesh will be scrambled on Linux (but not on MacOS) if you manipulate it.
+            composite_rgb = composite_RGB[:, :, :]
 
         # Flatten the array, becuase that's what pcolormesh wants.
         composite_colorTuple = composite_rgb.reshape((composite_rgb.shape[0] * composite_rgb.shape[1]), 3)
