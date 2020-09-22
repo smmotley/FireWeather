@@ -23,7 +23,7 @@ function MBLAYER(layerOptions){
     this.tileSize=layerOptions.tileSize;
     this.z=layerOptions.zindex;
     this.currentValue=layerOptions.currentValue;
-    this.forecastValue=layerOptions.currentValue;
+    this.forecastValue=layerOptions.forecastValue;
     this.defaultOptions=layerOptions.defaultOptions;
     this.autoRefresh=layerOptions.autoRefresh;
     this.sortOrder=layerOptions.sortOrder;

@@ -553,9 +553,13 @@ export default class TileLoader{
         getProductTimes(tileLayers.layer[product]).then(timeStampsClone => {
             var tileNames = [...timeStampsClone]
             var frames = 1
+            console.log(tileNames)
 
             // Set max value for timeline scrubber.
             $('#timelineScrubber')[0].max = tileNames.length - 1
+
+            //When user clicks to add a layer, set the scrubber value to the max value.
+            $('#timelineScrubber')[0].value = tileNames.length - 1
             if (animate === true){
                 frames = tileNames.length
             }
@@ -577,7 +581,7 @@ export default class TileLoader{
                         "tiles": [url],
                         "tileSize": tileLayers.layer[product].tileSize              // rasters are 256, vectors 512
                     });
-                    console.log("added Source: ", tileLayers.layer[product].source_id + i, tileLayers.layer[product], url)
+                    console.log("added Source: ", tileLayers.layer[product].source_id + i)
                 }
                 catch(err){
                     //If source already exists, update the url anyway
@@ -710,7 +714,10 @@ export default class TileLoader{
         var product_times = tileLayers.layer[product].timestamps
         var prettyTime = this.range_slider_times(product)
         var frameCount = product_times.length;
-        var frame = frameCount - 1;
+        var forecastValue = tileLayers.layer[product].forecastValue
+        var frame = 0
+        if (forecastValue){frame = frameCount - 1;}
+        var frame_displaying = 0
         var tile_id = tileLayers.layer[product].layer_id
         var opacitySlider = document.getElementById('opacity_slider');
         $('#timelineScrubber')[0].max = frameCount - 1
@@ -720,10 +727,21 @@ export default class TileLoader{
                 visible_layer_opacity = parseInt(opacitySlider.value, 10) / 100
             }
             //If this were a polygon, we'd use "fill-opacity" instead of "raster-opacity'
-            map.setPaintProperty(tile_id + frame, 'raster-opacity-transition', {duration:0, delay:0});
-            map.setPaintProperty(tile_id + frame, 'raster-opacity', 0);
-            frame = (frame + 1) % frameCount;
-            map.setPaintProperty(tile_id + frame, 'raster-opacity', visible_layer_opacity);
+            map.setPaintProperty(tile_id + frame_displaying, 'raster-opacity-transition', {duration:0, delay:0});
+            map.setPaintProperty(tile_id + frame_displaying, 'raster-opacity', 0);
+
+            // ANIMATE PRESENT --> FUTURE.
+            if (forecastValue){
+                frame = (frame + 1) % frameCount;
+                frame_displaying = frame
+            }
+            // ANIMATE PAST --> PRESENT.
+            else {
+                frame += 1
+                frame_displaying = (frame - frameCount) * -1
+                if (frame > (frameCount - 1)) {frame = 0}
+            }
+            map.setPaintProperty(tile_id + frame_displaying, 'raster-opacity', visible_layer_opacity);
             $('#timelineScrubber')[0].value = frame
             dateSlider.innerText = prettyTime[(frameCount-1)-frame]
         }

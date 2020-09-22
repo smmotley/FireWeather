@@ -4,7 +4,7 @@ export default function createMap(onLoad, mapboxgl = window.mapboxgl) {
         container: 'map',
         style: 'mapbox://styles/mapbox/streets-v10',
         center: [-120.5, 39.05],
-        zoom: 9
+        zoom: 6
     });
     map.on('load', () => onLoad(map))
 }

@@ -12,7 +12,7 @@ from osgeo import osr
 import numpy as np
 import rasterio
 from rasterio import features, crs
-import fiona
+#import fiona
 
 
 class TileRBG:
@@ -108,7 +108,7 @@ class TileRBG:
             width=nx,
             height=ny,
             outputBoundsSRS="EPSG:4326",  # WGS84 - Allows use of lat/lon outputBounds
-            outputBounds=[-152.0, 30.0, -110.0, 50.0], # lat/long of ll, ur corners
+            outputBounds=[-161.0, 15.0, -103.0, 50.0], # lat/long of ll, ur corners
             dstSRS="EPSG:4326",  # GOES-17 full-disk crosses the anti-meridian
             warpOptions=["SOURCE_EXTRA=500"],  # Magic from The Internet for off-earth pixels
             multithread=True,  # Not sure if this buys anything on my setup
