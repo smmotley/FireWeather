@@ -497,7 +497,7 @@ footer.page-footer {
 .speedControl{
   border-left: 1px solid #ccc;
   max-width: 90px;
-  padding: 3px 10px 0;
+  padding: 20px 10px;
 }
 
 .scrubberControl{

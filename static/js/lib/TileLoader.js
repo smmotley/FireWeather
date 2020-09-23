@@ -266,6 +266,7 @@ window.tileLayers = {};
 window.colormap = {}
 var imgLooper = null;
 var dateSlider = document.getElementById("timelineClock");
+const animationSpeed = document.querySelector("#animationSpeed")
 
 tileLayers.baseURL={
     RADAR_COMP: (tile_names,i) => `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-${tile_names[i]}/{z}/{x}/{y}.png`,
@@ -327,7 +328,6 @@ tileLayers.baseURL={
 
 // THIS SECTION WILL APPEND CHECKBOXES TO THE SIDEBAR_MARKER_TOGGLES.HTML SECTION.
 // ALL LAYER TYPES ARE "VECTOR" UNLESS IT'S THE VIS_SAT VECTORIZED DATA
-window.onload =
     tileLayers.layer = {
         "vis_sat": layer_constructor("Satellite", 'vis_sat', tileLayers.baseURL.VIS_SATELLITE, "%Y%m%d_%H%M", 'raster'),
         "radar": layer_constructor("Radar", 'radar', tileLayers.baseURL.RADAR_COMP, "%Q", 'raster'),
@@ -703,10 +703,11 @@ export default class TileLoader{
     }
 
     animateTiles(map,product,frames,animation) {
+        var speedControl = 300
         if (animation === true){
             imgLooper = setInterval(function(){
                 loop()
-            },300)
+            },speedControl)
         }
         if (animation === false){
             clearInterval(imgLooper)
@@ -747,6 +748,28 @@ export default class TileLoader{
             dateSlider.innerText = prettyTime[(frameCount-1)-frame]
         }
 
+        animationSpeed.addEventListener('click',() =>{
+            clearInterval(imgLooper)
+            if (animation === true){
+                if (animationSpeed.value === "300") {
+                    // speed up
+                    animationSpeed.value = 100
+                    // Change fast forward button to 1 arrow
+                    $('.fast-forward-button').text('play_arrow')
+                    $('#fast_forward_label').text("1x")
+                }
+                else{
+                    // slow down
+                    animationSpeed.value = 300
+                    // Change fast forward button to 1 arrow
+                    $('.fast-forward-button').text('fast_forward')
+                    $('#fast_forward_label').text("2x")
+                }
+                imgLooper = setInterval(function(){
+                    loop()
+                },animationSpeed.value)
+        }
+            })
     }
 
     range_slider_times(product){

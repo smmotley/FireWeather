@@ -375,6 +375,7 @@ createMap(map => {
         })
     })
 
+
     markerToggles.addEventListener('change', (elem) => {
             const isChecked = elem.srcElement.checked
             if (isChecked) {
