@@ -327,7 +327,7 @@ tileLayers.baseURL={
 
 // THIS SECTION WILL APPEND CHECKBOXES TO THE SIDEBAR_MARKER_TOGGLES.HTML SECTION.
 // ALL LAYER TYPES ARE "VECTOR" UNLESS IT'S THE VIS_SAT VECTORIZED DATA
-$(document).ready(function() {
+window.onload =
     tileLayers.layer = {
         "vis_sat": layer_constructor("Satellite", 'vis_sat', tileLayers.baseURL.VIS_SATELLITE, "%Y%m%d_%H%M", 'raster'),
         "radar": layer_constructor("Radar", 'radar', tileLayers.baseURL.RADAR_COMP, "%Q", 'raster'),
@@ -337,7 +337,7 @@ $(document).ready(function() {
         "ndfd_14d_temp": layer_constructor("14-Day Temp Forecast", 'ndfd_14d_temp', tileLayers.baseURL.NDFD_14D_TEMP, "%Q", 'raster'),
         "ndfd_14d_precip": layer_constructor("14-Day Precip Forecast", 'ndfd_14d_precip', tileLayers.baseURL.NDFD_14D_PRECIP, "%Q", 'raster'),
     }
-})
+
 
 function createValueMap(min, max) {
     const map = [...valueMap];
@@ -555,7 +555,6 @@ export default class TileLoader{
         getProductTimes(tileLayers.layer[product]).then(timeStampsClone => {
             var tileNames = [...timeStampsClone]
             var frames = 1
-            console.log(tileNames)
 
             // Set max value for timeline scrubber.
             $('#timelineScrubber')[0].max = tileNames.length - 1

@@ -332,7 +332,6 @@ createMap(map => {
     layerToggles.forEach(function(elem){
             elem.addEventListener('change', () =>{
                 const isChecked = elem.checked
-                console.log(elem)
                 if (!isChecked) {
                     animateButton[0].setAttribute('data-animating', 'nothing')
                     tileSet.removeTiles(map,elem.dataset.do)

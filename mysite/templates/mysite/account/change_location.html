@@ -17,6 +17,7 @@
         <li class="tab col s3"><a class="active" href="#map_tab">Map Your Locations</a></li>
       </ul>
     </div>
+{% include "mysite/includes/sidebar_fixed_map.html"%}
     <div id="map_tab" class="col s12">
         <div class="card-pannel z-depth-2">
             <div id="map_geolocation" class="map map-big"></div>
@@ -30,7 +31,7 @@
 
         </div>
     </div>
-    <div id="location_tab" class="col s12">
+    <div id="location_tab" class="col s11" style="max-width: 80%; margin:70px">
         <div class="card-pannel z-depth-2">
             <div class="row">
                 <span class="col s1" style="margin-top: 10px">

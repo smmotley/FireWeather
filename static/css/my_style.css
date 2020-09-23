@@ -29,7 +29,7 @@
   position:inherit;
   height: -o-calc(100% - 112px); /* opera */
   height: -webkit-calc(100% - 112px); /* google, safari */
-  height: -moz-calc(100% - 112px); /* firefox */
+  height: calc(100vh - 112px); /* firefox */
   width: 100%;
   max-width: 100%;
   border-top-style: solid;

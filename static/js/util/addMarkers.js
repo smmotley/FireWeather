@@ -114,25 +114,25 @@ export class fireMarkers {
                 el.style.width = '25px';
                 el.style.height = '30px';
             }
-
+            console.log(feature)
             let popup = new mapboxgl.Popup({
                 offset: 25,
                 closeButton: true,
                 closeOnClick: true
             }).setHTML(
-                "    <div class=\"col s12 m6\">\n" +
-                "      <div class=\"card\">\n" +
-                "        <div class=\"card-image\"> <img src=\"data:image/png;base64," + goes_image + "\">\n" +
-                "          <span class=\"card-title\">" + feature.properties.fire_name + "</span>\n" +
-                "          <p>I am a very simple card. I am good at containing small bits of information.\n" +
-                "          I am convenient because I require little markup to use effectively.</p>\n" +
-                "        </div>\n" +
-                "        <div class=\"card-action\">\n" +
-                "          <a href=\" " + feature.properties.fire_url + "\">Additional Fire Info</a>\n" +
-                "          <a href=\"#\">This is a link</a>\n" +
-                "        </div>\n" +
-                "      </div>\n" +
-                "    </div>\n");
+                "    <div class=\"card grey-box gradient-shadow\">\n" +
+        "      <div class=\"card-content popup white-text\">\n" +
+        "          <span class=\"card-title center-align no-margin\">"+feature.properties.fire_name+"</span>\n" +
+        "           <div class=\"center-align\">Additional Info</div>\n" +
+        "           <div class=\"divider\"></div>\n" +
+        "          <div id='calfireURL' class='coordinates'>" +
+        "               <b>URL: </b> "  + "<a target=\"_blank\" rel=\"noopener noreferrer\" href=\" " + feature.properties.fire_url + "\">Cal Fire Incident Page</a></u>\n" +
+        "          </div>" +
+        "           <div class=\"divider\"></div>\n" +
+        "          <div id='acresBurned'><b>Acres Burned:  " + feature.properties.acres_burned + "</b>" +
+        "          </div>\n" +
+        "        </div>\n" +
+        "      </div>\n")
 
             var single_marker = new mapboxgl.Marker(el)
                 .setLngLat(feature.geometry.coordinates)
@@ -149,12 +149,12 @@ export class fireMarkers {
             })
             el.addEventListener('mouseover', (e) => {
                 let station_name = (e.target.id).split("_");
-                popup.addTo(map);
+                //popup.addTo(map);
                 //console.log(station_name);
             })
             el.addEventListener('mouseout', (e) => {
                 let station_name = (e.target.id).split("_");
-                popup.remove();
+                //popup.remove();
                 //console.log(station_name);
             })
 
