@@ -20,9 +20,10 @@ from pyproj import Proj
 t1 = Timeloop()
 
 rioMaxZoomResolution = '6'  # Max Zoom for tile creation (For CONUS, 8 gives max res. For MESO 10 gives max).
+                            # Max zooms over 6 create a very expensive tileset on mapbox server!
 if "Linux" in platform.platform(terse=True):
     sys.path.append("/var/www/FireWeather")
-    rioMaxZoomResolution = '8'  # Max Zoom for tile creation (For CONUS, 8 gives max res. For MESO 10 gives max).
+    rioMaxZoomResolution = '6'  # Max Zoom for tile creation (For CONUS, 8 gives max res. For MESO 10 gives max).
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'FireWeather.settings')
 django.setup()

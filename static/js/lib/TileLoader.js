@@ -459,11 +459,22 @@ async function getProductTimes(product){
     if (product.source_id === 'vis_sat') {
         const response = await fetch('https://api.mapbox.com/tilesets/v1/smotley?access_token=sk.eyJ1Ijoic21vdGxleSIsImEiOiJja2NjYnZ4Z3AwMzZ2MnJwcWV0dmxrcDQzIn0.qheNdC3aHpFz1T1uPTKKug');
         const json = await response.json();
+        const localt = new Date()
+        const utcDate = new Date(localt.getTime() + localt.getTimezoneOffset() * 60000);
+        const GOES_dateFormat = d3.timeParse("%Y%m%d_%H%M")
         const goes_obj = json.filter(item => item.name.includes('GOES17_'))
         for (let i = 0; i < goes_obj.length; i++) {
             const datetime = (goes_obj[i]['name']).split('GOES17_')[1]
-            times.push(datetime)
+            const goesTime = GOES_dateFormat(datetime)
+            const timeDiff = d3.timeHour.count(goesTime,utcDate)
+            if (timeDiff < 3){
+                    times.push(datetime)
+                }
             }
+        if (times.length === 0){
+            M.toast({html: "No recent Satellite Data Found",
+                classes: 'red rounded', displayLength:3000});
+        }
         //times.reverse();
     }
     //times.reverse();

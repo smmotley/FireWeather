@@ -176,7 +176,8 @@ def delete_tilesets(tile_list, mb_access_token):
     for tile_set in goes_tiles:
         tile_time = (tile_set['name']).split('GOES17_',1)[1]
         tile_time = datetime.strptime(tile_time, "%Y%m%d_%H%M").replace(tzinfo=pytz.utc)
-        # Delete any images older than 4 hours.
+        # Delete any images older than 6 hours. This will not limit the animation on the website, that is
+        # currently handled in the TileLoader.js file under the getProductTimes function.
         if tile_time < (datetime.now(pytz.utc) - timedelta(hours=6)):
             print("DELETING TILESET: "+tile_set['id'])
             d = requests.delete(f"https://api.mapbox.com/tilesets/v1/{tile_set['id']}?access_token={mb_access_token}")
